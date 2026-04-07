@@ -1,0 +1,78 @@
+{% load static i18n %}
+<!DOCTYPE html>
+{% get_current_language as LANGUAGE_CODE %}
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="x-ua-compatible" content="ie=edge" />
+  <title>{% block title %}Everdries Ad Generator{% endblock title %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Everdries Ad Generator" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'brand-green': '#22c55e',
+          }
+        }
+      }
+    }
+  </script>
+
+  {% block extra_css %}{% endblock extra_css %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+  {% block body %}
+  <!-- Top Navigation -->
+  <nav class="bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a href="{% url 'campaigns:dashboard' %}" class="text-xl font-semibold text-gray-800">
+            Everdries Ad Generator
+          </a>
+        </div>
+        <div class="flex items-center space-x-4">
+          {% if request.user.is_authenticated %}
+            <span class="text-sm text-gray-600">{{ request.user.email }}</span>
+            <a href="{% url 'account_logout' %}"
+               class="text-sm text-gray-600 hover:text-gray-800">
+              Sign Out
+            </a>
+          {% else %}
+            <a href="{% url 'account_login' %}"
+               class="text-sm text-gray-600 hover:text-gray-800">
+              Sign In
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Messages -->
+  {% if messages %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+      {% for message in messages %}
+        <div class="rounded-md p-4 mb-2 {% if message.tags == 'error' %}bg-red-50 text-red-700{% elif message.tags == 'success' %}bg-green-50 text-green-700{% else %}bg-blue-50 text-blue-700{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {% block content %}{% endblock content %}
+  </main>
+  {% endblock body %}
+
+  {% block modal %}{% endblock modal %}
+
+  {% block extra_js %}{% endblock extra_js %}
+</body>
+</html>

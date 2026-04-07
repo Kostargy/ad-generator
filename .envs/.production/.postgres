@@ -1,0 +1,7 @@
+# PostgreSQL
+# ------------------------------------------------------------------------------
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=everdries_ad_generator
+POSTGRES_USER=wjSVJwSmWgJIkWUYBugrrQsZGOedXDKL
+POSTGRES_PASSWORD=zOGi1Rw4vR8yAUA08pKM0ihsCy0mkcwqFMqz84aJSyYE9qQVVKJgCFIBABnqlter

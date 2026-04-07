@@ -1,0 +1,182 @@
+{% extends "base_tailwind.html" %}
+
+{% block title %}Ads - {{ campaign.name }} - Everdries Ad Generator{% endblock title %}
+
+{% block content %}
+<div>
+  <!-- Page Title -->
+  <h1 class="text-2xl font-semibold text-gray-800 mb-6">{{ campaign.name }}</h1>
+
+  <!-- Tab Navigation -->
+  <div class="flex space-x-2 mb-6">
+    <a href="{% url 'campaigns:dashboard' %}"
+       class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+      Campaigns
+    </a>
+    <a href="{% url 'campaigns:generator_list' campaign.id %}"
+       class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+      Generators
+    </a>
+    <span class="px-6 py-2 border-l-4 border-l-green-500 border-t border-r border-b-0 rounded-t-lg font-medium bg-white text-gray-800">
+      Ads
+    </span>
+  </div>
+
+  <!-- Content Card -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <!-- Card Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-lg font-medium text-gray-800">Ads</h2>
+      <div class="flex space-x-2">
+        <button type="button"
+                class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+          Export
+        </button>
+        <button type="button"
+                class="px-4 py-2 border border-gray-200 rounded-md text-sm text-gray-400 cursor-not-allowed"
+                disabled
+                title="Ads are created by the generator">
+          + new Ad
+        </button>
+      </div>
+    </div>
+
+    <!-- Ads List -->
+    <div class="space-y-4">
+      {% for ad in ads %}
+      <div class="flex items-center border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+           data-ad-id="{{ ad.id }}">
+        <!-- Thumbnail -->
+        <div class="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden mr-4">
+          {% if ad.image %}
+            <img src="{{ ad.image.url }}" alt="{{ ad.headline }}" class="w-full h-full object-cover">
+          {% else %}
+            <div class="w-full h-full flex items-center justify-center text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Content -->
+        <div class="flex-grow min-w-0">
+          <h3 class="text-sm font-medium text-gray-800 truncate">{{ ad.headline }}</h3>
+          <p class="text-xs text-gray-500 mt-1">{{ ad.generator.title }}</p>
+          <!-- Status Badge -->
+          <span class="inline-block mt-2 px-2 py-0.5 text-xs rounded-full
+            {% if ad.status == 'approved' %}bg-green-100 text-green-700
+            {% elif ad.status == 'rejected' %}bg-red-100 text-red-700
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{ ad.get_status_display }}
+          </span>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center space-x-2 ml-4">
+          <a href="{% url 'campaigns:ad_detail' campaign.id ad.id %}"
+             class="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+            Edit
+          </a>
+          <button type="button"
+                  onclick="approveAd({{ ad.id }})"
+                  class="approve-btn px-3 py-1.5 border border-green-500 rounded-md text-sm text-green-600 hover:bg-green-50 transition-colors {% if ad.status == 'approved' %}bg-green-50{% endif %}">
+            Approve
+          </button>
+          <button type="button"
+                  onclick="rejectAd({{ ad.id }})"
+                  class="reject-btn px-3 py-1.5 border border-red-500 rounded-md text-sm text-red-600 hover:bg-red-50 transition-colors {% if ad.status == 'rejected' %}bg-red-50{% endif %}">
+            Reject
+          </button>
+        </div>
+      </div>
+      {% empty %}
+      <div class="py-12 text-center text-gray-500">
+        No ads yet. Ads will appear here once generated.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+function updateAdStatus(adId, newStatus) {
+  const adRow = document.querySelector(`[data-ad-id="${adId}"]`);
+  if (!adRow) return;
+
+  const badge = adRow.querySelector('.rounded-full');
+  const approveBtn = adRow.querySelector('.approve-btn');
+  const rejectBtn = adRow.querySelector('.reject-btn');
+
+  // Update badge
+  badge.className = 'inline-block mt-2 px-2 py-0.5 text-xs rounded-full';
+  if (newStatus === 'approved') {
+    badge.classList.add('bg-green-100', 'text-green-700');
+    badge.textContent = 'Approved';
+    approveBtn.classList.add('bg-green-50');
+    rejectBtn.classList.remove('bg-red-50');
+  } else if (newStatus === 'rejected') {
+    badge.classList.add('bg-red-100', 'text-red-700');
+    badge.textContent = 'Rejected';
+    rejectBtn.classList.add('bg-red-50');
+    approveBtn.classList.remove('bg-green-50');
+  } else {
+    badge.classList.add('bg-gray-100', 'text-gray-600');
+    badge.textContent = 'Pending';
+    approveBtn.classList.remove('bg-green-50');
+    rejectBtn.classList.remove('bg-red-50');
+  }
+}
+
+function approveAd(adId) {
+  fetch(`/app/ads/${adId}/approve/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      updateAdStatus(adId, data.new_status);
+    }
+  })
+  .catch(error => console.error('Error:', error));
+}
+
+function rejectAd(adId) {
+  fetch(`/app/ads/${adId}/reject/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      updateAdStatus(adId, data.new_status);
+    }
+  })
+  .catch(error => console.error('Error:', error));
+}
+</script>
+{% endblock extra_js %}

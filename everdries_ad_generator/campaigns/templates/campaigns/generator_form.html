@@ -1,0 +1,539 @@
+{% extends "base_tailwind.html" %}
+
+{% block title %}{{ page_title }} - Everdries Ad Generator{% endblock title %}
+
+{% block content %}
+<div>
+  <!-- Breadcrumb -->
+  <nav class="mb-6">
+    <a href="{% url 'campaigns:generator_list' campaign.id %}" class="text-green-600 hover:text-green-700">
+      &larr; Back to Generators
+    </a>
+  </nav>
+
+  <!-- Page Title -->
+  <h1 class="text-2xl font-semibold text-gray-800 mb-2">{{ page_title }}</h1>
+  <p class="text-gray-500 mb-6">You can create a generator or choose from a template. You can also save this as a template.</p>
+
+  <!-- Form Card -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-2xl">
+    <form method="post" action="{{ form_action }}">
+      {% csrf_token %}
+
+      <!-- Title -->
+      <div class="mb-6">
+        <label for="title" class="block text-sm font-medium text-gray-700 mb-2">
+          Title <span class="text-red-500">*</span>
+        </label>
+        <input type="text"
+               id="title"
+               name="title"
+               required
+               value="{{ generator.title|default:'' }}"
+               class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+               placeholder="e.g., Spring Sale - Benefit Focus">
+      </div>
+
+      <!-- Brief -->
+      <div class="mb-6">
+        <label for="brief" class="block text-sm font-medium text-gray-700 mb-2">
+          Brief
+        </label>
+        <textarea id="brief"
+                  name="brief"
+                  rows="4"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Describe the creative direction, messaging angle, or key points for this generator...">{{ generator.brief|default:'' }}</textarea>
+      </div>
+
+      <!-- Customer Persona -->
+      <div class="mb-6">
+        <label for="customer_persona" class="block text-sm font-medium text-gray-700 mb-2">
+          Customer Persona
+        </label>
+        <div class="flex space-x-2">
+          <select id="customer_persona"
+                  name="customer_persona"
+                  class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+            <option value="">Select a persona...</option>
+            {% for persona in personas %}
+            <option value="{{ persona.id }}"
+                    {% if generator.customer_persona_id == persona.id %}selected{% endif %}>
+              {{ persona.name }}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="button"
+                  onclick="openPersonaModal()"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap">
+            + Add
+          </button>
+        </div>
+      </div>
+
+      <!-- Style References -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Style References
+          <span class="font-normal text-gray-500">(copy the visual layout)</span>
+        </label>
+        <div class="border border-gray-300 rounded-md p-4">
+          {% if style_assets %}
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            {% for asset in style_assets %}
+            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox"
+                     name="style_references"
+                     value="{{ asset.id }}"
+                     {% if generator and asset in generator.style_references.all %}checked{% endif %}
+                     class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded">
+              <img src="{{ asset.image.url }}" alt="{{ asset.name }}" class="w-20 h-20 object-cover rounded">
+              <span class="text-sm text-gray-700 truncate">{{ asset.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-sm text-gray-500 mb-3">No style references uploaded yet.</p>
+          {% endif %}
+          <button type="button"
+                  onclick="openAssetModal('style')"
+                  class="text-sm text-green-600 hover:text-green-700 font-medium">
+            + Upload Style Reference
+          </button>
+        </div>
+      </div>
+
+      <!-- Product References -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Product References
+          <span class="font-normal text-gray-500">(use this product in the generated image)</span>
+        </label>
+        <div class="border border-gray-300 rounded-md p-4">
+          {% if product_assets %}
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            {% for asset in product_assets %}
+            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox"
+                     name="product_references"
+                     value="{{ asset.id }}"
+                     {% if generator and asset in generator.product_references.all %}checked{% endif %}
+                     class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded">
+              <img src="{{ asset.image.url }}" alt="{{ asset.name }}" class="w-20 h-20 object-cover rounded">
+              <span class="text-sm text-gray-700 truncate">{{ asset.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-sm text-gray-500 mb-3">No product references uploaded yet.</p>
+          {% endif %}
+          <button type="button"
+                  onclick="openAssetModal('product')"
+                  class="text-sm text-green-600 hover:text-green-700 font-medium">
+            + Upload Product Reference
+          </button>
+        </div>
+      </div>
+
+      <!-- Number of Ads -->
+      <div class="mb-6">
+        <label for="number_of_ads" class="block text-sm font-medium text-gray-700 mb-2">
+          Number of Ads
+        </label>
+        <input type="number"
+               id="number_of_ads"
+               name="number_of_ads"
+               min="1"
+               max="50"
+               value="{{ generator.number_of_ads|default:5 }}"
+               class="w-32 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+      </div>
+
+      <!-- Dimensions -->
+      <div class="mb-6">
+        <label for="dimensions" class="block text-sm font-medium text-gray-700 mb-2">
+          Dimensions
+        </label>
+        <select id="dimensions"
+                name="dimensions"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+          <option value="">Select dimensions...</option>
+          <option value="1080x1080" {% if generator.dimensions == '1080x1080' %}selected{% endif %}>1080x1080 (Square - Feed)</option>
+          <option value="1080x1350" {% if generator.dimensions == '1080x1350' %}selected{% endif %}>1080x1350 (Portrait 4:5 - Feed)</option>
+          <option value="1080x1920" {% if generator.dimensions == '1080x1920' %}selected{% endif %}>1080x1920 (Story/Reel 9:16)</option>
+          <option value="1920x1080" {% if generator.dimensions == '1920x1080' %}selected{% endif %}>1920x1080 (Landscape 16:9)</option>
+          <option value="1200x628" {% if generator.dimensions == '1200x628' %}selected{% endif %}>1200x628 (Facebook Link Ad)</option>
+          <option value="1200x1200" {% if generator.dimensions == '1200x1200' %}selected{% endif %}>1200x1200 (Square - High Res)</option>
+        </select>
+      </div>
+
+      <!-- Placement -->
+      <div class="mb-6">
+        <label for="placement" class="block text-sm font-medium text-gray-700 mb-2">
+          Placement
+        </label>
+        <select id="placement"
+                name="placement"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+          <option value="">Select placement...</option>
+          <option value="feed" {% if generator.placement == 'feed' %}selected{% endif %}>Feed</option>
+          <option value="stories" {% if generator.placement == 'stories' %}selected{% endif %}>Stories</option>
+          <option value="reels" {% if generator.placement == 'reels' %}selected{% endif %}>Reels</option>
+          <option value="feed,stories" {% if generator.placement == 'feed,stories' %}selected{% endif %}>Feed + Stories</option>
+          <option value="feed,stories,reels" {% if generator.placement == 'feed,stories,reels' %}selected{% endif %}>All Placements</option>
+        </select>
+      </div>
+
+      <!-- Save as Template -->
+      <div class="mb-6">
+        <label class="flex items-center">
+          <input type="checkbox"
+                 name="is_template"
+                 {% if generator.is_template %}checked{% endif %}
+                 class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded">
+          <span class="ml-2 text-sm text-gray-700">Save as template</span>
+        </label>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+        <a href="{% url 'campaigns:generator_list' campaign.id %}"
+           class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+          Cancel
+        </a>
+        <button type="submit"
+                class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
+          {% if is_edit %}Update Generator{% else %}Create Generator{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Asset Upload Modal -->
+<div id="assetModal"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 id="assetModalTitle" class="text-lg font-medium text-gray-800">Upload Asset</h3>
+      <button type="button"
+              onclick="closeAssetModal()"
+              class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <form id="assetForm" enctype="multipart/form-data">
+      <div class="px-6 py-4">
+        <input type="hidden" id="asset_type" name="asset_type" value="">
+
+        <div class="mb-4">
+          <label for="asset_name" class="block text-sm font-medium text-gray-700 mb-1">
+            Name <span class="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input type="text"
+                 id="asset_name"
+                 name="name"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                 placeholder="Leave blank to use filename">
+        </div>
+
+        <div class="mb-4">
+          <label for="asset_image" class="block text-sm font-medium text-gray-700 mb-1">
+            Image <span class="text-red-500">*</span>
+          </label>
+          <input type="file"
+                 id="asset_image"
+                 name="image"
+                 accept="image/*"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+          <div id="asset_preview" class="mt-2 hidden">
+            <img id="asset_preview_img" src="" alt="Preview" class="w-full h-64 object-contain rounded border border-gray-200">
+          </div>
+        </div>
+
+        <div id="asset_error" class="hidden text-red-500 text-sm mb-4"></div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+        <button type="button"
+                onclick="closeAssetModal()"
+                class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+          Cancel
+        </button>
+        <button type="button"
+                onclick="uploadAsset()"
+                class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
+          Upload
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Persona Modal -->
+<div id="personaModal"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 class="text-lg font-medium text-gray-800">Add Customer Persona</h3>
+      <button type="button"
+              onclick="closePersonaModal()"
+              class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="px-6 py-4">
+      <div class="mb-4">
+        <label for="persona_name" class="block text-sm font-medium text-gray-700 mb-1">
+          Name <span class="text-red-500">*</span>
+        </label>
+        <input type="text"
+               id="persona_name"
+               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+               placeholder="e.g., Active Senior (65+)">
+      </div>
+
+      <div class="mb-4">
+        <label for="persona_description" class="block text-sm font-medium text-gray-700 mb-1">
+          Description
+        </label>
+        <textarea id="persona_description"
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Describe this persona..."></textarea>
+      </div>
+
+      <div id="persona_error" class="hidden text-red-500 text-sm mb-4"></div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+      <button type="button"
+              onclick="closePersonaModal()"
+              class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+        Cancel
+      </button>
+      <button type="button"
+              onclick="savePersona()"
+              class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
+        Add Persona
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+  // Asset Modal Functions
+  let currentAssetType = '';
+
+  function openAssetModal(type) {
+    currentAssetType = type;
+    document.getElementById('asset_type').value = type;
+    document.getElementById('asset_name').value = '';
+    document.getElementById('asset_image').value = '';
+    document.getElementById('asset_preview').classList.add('hidden');
+    document.getElementById('asset_error').classList.add('hidden');
+
+    const title = type === 'style' ? 'Upload Style Reference' : 'Upload Product Reference';
+    document.getElementById('assetModalTitle').textContent = title;
+
+    document.getElementById('assetModal').classList.remove('hidden');
+    document.getElementById('assetModal').classList.add('flex');
+    document.getElementById('asset_name').focus();
+  }
+
+  function closeAssetModal() {
+    document.getElementById('assetModal').classList.add('hidden');
+    document.getElementById('assetModal').classList.remove('flex');
+  }
+
+  // Image preview
+  document.getElementById('asset_image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('asset_preview_img').src = e.target.result;
+        document.getElementById('asset_preview').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  async function uploadAsset() {
+    const name = document.getElementById('asset_name').value.trim();
+    const imageInput = document.getElementById('asset_image');
+    const errorEl = document.getElementById('asset_error');
+
+    if (!imageInput.files.length) {
+      errorEl.textContent = 'Image is required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('asset_type', currentAssetType);
+    formData.append('image', imageInput.files[0]);
+
+    try {
+      const response = await fetch('{% url "campaigns:asset_upload" %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        errorEl.textContent = data.error || 'Failed to upload asset.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      // Add new checkbox to the appropriate section
+      const containerId = currentAssetType === 'style' ? 'style_references_container' : 'product_references_container';
+      addAssetCheckbox(data, currentAssetType);
+
+      closeAssetModal();
+    } catch (error) {
+      errorEl.textContent = 'Network error. Please try again.';
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  function addAssetCheckbox(asset, type) {
+    const fieldName = type === 'style' ? 'style_references' : 'product_references';
+    // Find the container - look for the grid or create one
+    const section = document.querySelector(`input[name="${fieldName}"]`)?.closest('.border.border-gray-300') ||
+                    document.querySelector(`button[onclick="openAssetModal('${type}')"]`)?.closest('.border.border-gray-300');
+
+    if (section) {
+      let grid = section.querySelector('.grid');
+      const emptyMsg = section.querySelector('p.text-gray-500');
+
+      // Remove empty message if present
+      if (emptyMsg) {
+        emptyMsg.remove();
+      }
+
+      // Create grid if doesn't exist
+      if (!grid) {
+        grid = document.createElement('div');
+        grid.className = 'grid grid-cols-2 gap-3 mb-3';
+        section.insertBefore(grid, section.querySelector('button'));
+      }
+
+      // Add the new checkbox
+      const label = document.createElement('label');
+      label.className = 'flex items-center space-x-3 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer';
+      label.innerHTML = `
+        <input type="checkbox"
+               name="${fieldName}"
+               value="${asset.id}"
+               checked
+               class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded">
+        <img src="${asset.image_url}" alt="${asset.name}" class="w-20 h-20 object-cover rounded">
+        <span class="text-sm text-gray-700 truncate">${asset.name}</span>
+      `;
+      grid.appendChild(label);
+    }
+  }
+
+  // Close asset modal when clicking outside
+  document.getElementById('assetModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeAssetModal();
+    }
+  });
+
+  // Persona Modal Functions
+  function openPersonaModal() {
+    document.getElementById('persona_name').value = '';
+    document.getElementById('persona_description').value = '';
+    document.getElementById('persona_error').classList.add('hidden');
+    document.getElementById('personaModal').classList.remove('hidden');
+    document.getElementById('personaModal').classList.add('flex');
+    document.getElementById('persona_name').focus();
+  }
+
+  function closePersonaModal() {
+    document.getElementById('personaModal').classList.add('hidden');
+    document.getElementById('personaModal').classList.remove('flex');
+  }
+
+  async function savePersona() {
+    const name = document.getElementById('persona_name').value.trim();
+    const description = document.getElementById('persona_description').value.trim();
+    const errorEl = document.getElementById('persona_error');
+
+    if (!name) {
+      errorEl.textContent = 'Name is required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const response = await fetch('{% url "campaigns:persona_create" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: JSON.stringify({ name, description }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        errorEl.textContent = data.error || 'Failed to create persona.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      // Add new option to select and select it
+      const select = document.getElementById('customer_persona');
+      const option = document.createElement('option');
+      option.value = data.id;
+      option.textContent = data.name;
+      option.selected = true;
+      select.appendChild(option);
+
+      closePersonaModal();
+    } catch (error) {
+      errorEl.textContent = 'Network error. Please try again.';
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  // Close modal when clicking outside
+  document.getElementById('personaModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closePersonaModal();
+    }
+  });
+
+  // Close modals with Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closePersonaModal();
+      closeAssetModal();
+    }
+  });
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,71 @@
+{% extends "base_tailwind.html" %}
+
+{% block title %}Campaigns - Everdries Ad Generator{% endblock title %}
+
+{% block content %}
+<div>
+  <!-- Page Title -->
+  <h1 class="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h1>
+
+  <!-- Tab Navigation -->
+  <div class="flex space-x-2 mb-6">
+    <span class="px-6 py-2 border-l-4 border-l-green-500 border-t border-r border-b-0 rounded-t-lg font-medium bg-white text-gray-800">
+      Campaigns
+    </span>
+    <span class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-400 cursor-not-allowed">
+      Generators
+    </span>
+    <span class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-400 cursor-not-allowed">
+      Ads
+    </span>
+  </div>
+
+  <!-- Content Card -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <!-- Card Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-lg font-medium text-gray-800">Campaigns</h2>
+      <a href="{% url 'campaigns:campaign_create' %}"
+         class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+        + new Campaign
+      </a>
+    </div>
+
+    <!-- Campaign Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Campaign Name</th>
+            <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Generators</th>
+            <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Ads</th>
+            <th class="text-right py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for campaign in campaigns %}
+          <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+              onclick="window.location='{% url 'campaigns:generator_list' campaign.id %}'">
+            <td class="py-4 px-4 text-sm text-gray-800">{{ campaign.name }}</td>
+            <td class="py-4 px-4 text-sm text-gray-600 text-center">{{ campaign.generators_count }}</td>
+            <td class="py-4 px-4 text-sm text-gray-600 text-center">{{ campaign.ads_count }}</td>
+            <td class="py-4 px-4 text-right" onclick="event.stopPropagation()">
+              <a href="{% url 'campaigns:campaign_edit' campaign.id %}"
+                 class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors inline-block">
+                Edit
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="py-8 text-center text-gray-500">
+              No campaigns yet. Click "+ new Campaign" to create one.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock content %}
