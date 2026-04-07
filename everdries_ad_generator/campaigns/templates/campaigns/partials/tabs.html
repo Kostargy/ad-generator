@@ -1,0 +1,27 @@
+<!-- Tab Navigation -->
+<div class="flex space-x-2 mb-6">
+  <a href="{% url 'campaigns:dashboard' %}"
+     class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+    Campaigns ({{ campaign.name }})
+  </a>
+  {% if active_tab == "generator" %}
+  <span class="px-6 py-2 border-l-4 border-l-green-500 border-t border-r border-b-0 rounded-t-lg font-medium bg-white text-gray-800">
+    Generators
+  </span>
+  {% else %}
+  <a href="{% url 'campaigns:generator_list' campaign.id %}"
+     class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+    Generators
+  </a>
+  {% endif %}
+  {% if active_tab == "ads" %}
+  <span class="px-6 py-2 border-l-4 border-l-green-500 border-t border-r border-b-0 rounded-t-lg font-medium bg-white text-gray-800">
+    Ads
+  </span>
+  {% else %}
+  <a href="{% url 'campaigns:ads_list' campaign.id %}"
+     class="px-6 py-2 border border-gray-300 rounded-t-lg font-medium bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+    Ads
+  </a>
+  {% endif %}
+</div>

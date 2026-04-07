@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Ad
 from .models import AdMessage
+from .models import APISettings
 from .models import Asset
 from .models import Campaign
 from .models import CustomerPersona
@@ -22,6 +23,7 @@ def dashboard(request):
     """Main dashboard showing campaigns list."""
     campaigns = Campaign.objects.filter(created_by=request.user)
     context = {
+        "active_nav": "generator",
         "active_tab": "campaigns",
         "campaigns": campaigns,
     }
@@ -35,6 +37,7 @@ def generator_list(request, campaign_id):
     generators = campaign.generators.all()
 
     context = {
+        "active_nav": "generator",
         "active_tab": "generator",
         "campaign": campaign,
         "generators": generators,
@@ -204,6 +207,7 @@ def generator_create(request, campaign_id):
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
         brief = request.POST.get("brief", "").strip()
+        headlines = request.POST.get("headlines", "").strip()
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
         product_ref_ids = request.POST.getlist("product_references")
@@ -236,6 +240,7 @@ def generator_create(request, campaign_id):
             campaign=campaign,
             title=title,
             brief=brief,
+            headlines=headlines,
             customer_persona=persona,
             number_of_ads=number_of_ads,
             dimensions=dimensions,
@@ -253,7 +258,16 @@ def generator_create(request, campaign_id):
                 Asset.objects.filter(id__in=product_ref_ids, created_by=request.user, asset_type=Asset.TYPE_PRODUCT)
             )
 
-        messages.success(request, f"Generator '{title}' created successfully.")
+        # Trigger generation task
+        from .tasks import generate_ads_task
+
+        print(f"[VIEW] generator_create: triggering generation for generator {generator.id}")
+        generator.status = Generator.STATUS_PROCESSING
+        generator.save(update_fields=["status"])
+        result = generate_ads_task.delay(generator.id)
+        print(f"[VIEW] generator_create: task dispatched with ID {result.id}")
+
+        messages.success(request, f"Generator '{title}' created. Image generation started.")
         return redirect("campaigns:generator_list", campaign_id=campaign_id)
 
     context = {
@@ -270,6 +284,38 @@ def generator_create(request, campaign_id):
 
 
 @login_required
+@require_POST
+def generate_ads(request, campaign_id, generator_id):
+    """Trigger ad generation for a generator via Celery task."""
+    from .tasks import generate_ads_task
+
+    print(f"[VIEW] generate_ads called: campaign={campaign_id}, generator={generator_id}")
+
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+    generator = get_object_or_404(Generator, id=generator_id, campaign=campaign)
+
+    print(f"[VIEW] Generator found: {generator.title}, status={generator.status}")
+
+    # Check if already processing
+    if generator.status == Generator.STATUS_PROCESSING:
+        print(f"[VIEW] Already processing, skipping")
+        messages.warning(request, "Generation is already in progress.")
+        return redirect("campaigns:generator_list", campaign_id=campaign_id)
+
+    # Mark as processing immediately
+    generator.status = Generator.STATUS_PROCESSING
+    generator.save(update_fields=["status", "updated_at"])
+
+    # Dispatch Celery task (non-blocking)
+    print(f"[VIEW] Dispatching Celery task for generator {generator.id}")
+    result = generate_ads_task.delay(generator.id)
+    print(f"[VIEW] Task dispatched: {result.id}")
+
+    messages.success(request, f"Image generation started for '{generator.title}'. Check back shortly.")
+    return redirect("campaigns:generator_list", campaign_id=campaign_id)
+
+
+@login_required
 def generator_edit(request, campaign_id, generator_id):
     """Edit an existing generator."""
     campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
@@ -277,10 +323,12 @@ def generator_edit(request, campaign_id, generator_id):
     personas = CustomerPersona.objects.filter(created_by=request.user)
     style_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_STYLE)
     product_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_PRODUCT)
+    view_only = request.GET.get("view") == "true"
 
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
         brief = request.POST.get("brief", "").strip()
+        headlines = request.POST.get("headlines", "").strip()
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
         product_ref_ids = request.POST.getlist("product_references")
@@ -311,6 +359,7 @@ def generator_edit(request, campaign_id, generator_id):
         # Update the generator
         generator.title = title
         generator.brief = brief
+        generator.headlines = headlines
         generator.customer_persona = persona
         generator.number_of_ads = number_of_ads
         generator.dimensions = dimensions
@@ -330,8 +379,9 @@ def generator_edit(request, campaign_id, generator_id):
         return redirect("campaigns:generator_list", campaign_id=campaign_id)
 
     context = {
-        "page_title": "Edit Generator",
+        "page_title": "View Generator" if view_only else "Edit Generator",
         "is_edit": True,
+        "view_only": view_only,
         "form_action": reverse("campaigns:generator_edit", args=[campaign_id, generator_id]),
         "campaign": campaign,
         "generator": generator,
@@ -400,3 +450,34 @@ def asset_upload(request):
         "asset_type": asset.asset_type,
         "image_url": asset.image.url,
     })
+
+
+@login_required
+def settings_view(request):
+    """Settings page for API keys configuration."""
+    api_settings = APISettings.get_settings()
+
+    if request.method == "POST":
+        primary_provider = request.POST.get("primary_provider", "").strip()
+        gemini_key = request.POST.get("gemini_api_key", "").strip()
+        openai_key = request.POST.get("openai_api_key", "").strip()
+        gemini_model = request.POST.get("gemini_model", "").strip()
+
+        if primary_provider:
+            api_settings.primary_provider = primary_provider
+        api_settings.gemini_api_key = gemini_key
+        api_settings.openai_api_key = openai_key
+        if gemini_model:
+            api_settings.gemini_model = gemini_model
+        api_settings.save()
+
+        messages.success(request, "API settings updated successfully.")
+        return redirect("campaigns:settings")
+
+    context = {
+        "active_nav": "settings",
+        "api_settings": api_settings,
+        "provider_choices": APISettings.PROVIDER_CHOICES,
+        "gemini_model_choices": APISettings.GEMINI_MODEL_CHOICES,
+    }
+    return render(request, "campaigns/settings.html", context)

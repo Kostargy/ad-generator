@@ -92,6 +92,17 @@ class Asset(models.Model):
 class Generator(models.Model):
     """A generator within a campaign."""
 
+    STATUS_PENDING = "pending"
+    STATUS_PROCESSING = "processing"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
     campaign = models.ForeignKey(
         Campaign,
         on_delete=models.CASCADE,
@@ -99,6 +110,12 @@ class Generator(models.Model):
     )
     title = models.CharField(max_length=255)
     brief = models.TextField(blank=True)
+    headlines = models.TextField(blank=True, help_text="Headlines for the ads, one per line")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+    )
     customer_persona = models.ForeignKey(
         CustomerPersona,
         on_delete=models.SET_NULL,
@@ -168,6 +185,11 @@ class Ad(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_PENDING,
     )
+    generation_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Stores generation context (prompt, references) for revisions",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -177,6 +199,52 @@ class Ad(models.Model):
 
     def __str__(self):
         return self.headline
+
+
+class APISettings(models.Model):
+    """Singleton model for API configuration."""
+
+    PROVIDER_CHOICES = [
+        ("gemini", "Gemini (Primary) → OpenAI (Fallback)"),
+        ("openai", "OpenAI (Primary) → Gemini (Fallback)"),
+        ("gemini_only", "Gemini Only"),
+        ("openai_only", "OpenAI Only"),
+    ]
+
+    GEMINI_MODEL_CHOICES = [
+        ("gemini-2.5-flash-image", "Gemini 2.5 Flash Image (Fast)"),
+        ("gemini-3.1-flash-image-preview", "Gemini 3.1 Flash Image Preview (High Volume)"),
+        ("gemini-3-pro-image-preview", "Gemini 3 Pro Image Preview (Professional)"),
+    ]
+
+    primary_provider = models.CharField(
+        max_length=20,
+        choices=PROVIDER_CHOICES,
+        default="gemini",
+        help_text="Which AI provider to use for image generation",
+    )
+    gemini_api_key = models.CharField(max_length=255, blank=True)
+    openai_api_key = models.CharField(max_length=255, blank=True)
+    gemini_model = models.CharField(
+        max_length=100,
+        choices=GEMINI_MODEL_CHOICES,
+        default="gemini-2.5-flash-image",
+        help_text="Gemini model to use for image generation",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "API Settings"
+        verbose_name_plural = "API Settings"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # Ensure singleton
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_settings(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
 
 class AdMessage(models.Model):

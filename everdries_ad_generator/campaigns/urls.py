@@ -8,6 +8,9 @@ urlpatterns = [
     # Dashboard (campaigns list)
     path("", views.dashboard, name="dashboard"),
 
+    # Settings
+    path("settings/", views.settings_view, name="settings"),
+
     # Campaign CRUD
     path("campaigns/new/", views.campaign_create, name="campaign_create"),
     path("campaigns/<int:campaign_id>/edit/", views.campaign_edit, name="campaign_edit"),
@@ -21,6 +24,7 @@ urlpatterns = [
     # Generators (within campaign)
     path("campaigns/<int:campaign_id>/generators/new/", views.generator_create, name="generator_create"),
     path("campaigns/<int:campaign_id>/generators/<int:generator_id>/edit/", views.generator_edit, name="generator_edit"),
+    path("campaigns/<int:campaign_id>/generators/<int:generator_id>/generate/", views.generate_ads, name="generate_ads"),
 
     # Ads (within campaign)
     path("campaigns/<int:campaign_id>/ads/<int:ad_id>/", views.ad_detail, name="ad_detail"),
