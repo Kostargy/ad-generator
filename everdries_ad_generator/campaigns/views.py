@@ -51,10 +51,23 @@ def ads_list(request, campaign_id):
     campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
     ads = Ad.objects.filter(generator__campaign=campaign).select_related("generator")
 
+    # Filter by generator if specified
+    generator_id = request.GET.get("generator")
+    selected_generator = None
+    if generator_id:
+        try:
+            selected_generator = Generator.objects.get(id=generator_id, campaign=campaign)
+            ads = ads.filter(generator=selected_generator)
+        except Generator.DoesNotExist:
+            pass
+
     context = {
+        "active_nav": "generator",
         "active_tab": "ads",
         "campaign": campaign,
         "ads": ads,
+        "selected_generator": selected_generator,
+        "generators": campaign.generators.all(),
     }
     return render(request, "campaigns/ads_list.html", context)
 

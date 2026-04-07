@@ -24,7 +24,12 @@
   <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
     <!-- Card Header -->
     <div class="flex justify-between items-center mb-6">
-      <h2 class="text-lg font-medium text-gray-800">Ads</h2>
+      <div class="flex items-center space-x-4">
+        <h2 class="text-lg font-medium text-gray-800">Ads</h2>
+        <span class="text-sm text-gray-500">
+          ({{ ads|length }} ad{{ ads|length|pluralize }})
+        </span>
+      </div>
       <div class="flex items-center space-x-4">
         <!-- View Toggle -->
         <div class="flex border border-gray-300 rounded-md overflow-hidden">
@@ -101,12 +106,12 @@
             Edit
           </a>
           <button type="button"
-                  onclick="approveAd({{ ad.id }})"
+                  onclick="approveAd({{ ad.id }}, event)"
                   class="approve-btn px-3 py-1.5 border border-green-500 rounded-md text-sm text-green-600 hover:bg-green-50 transition-colors {% if ad.status == 'approved' %}bg-green-50{% endif %}">
             Approve
           </button>
           <button type="button"
-                  onclick="rejectAd({{ ad.id }})"
+                  onclick="rejectAd({{ ad.id }}, event)"
                   class="reject-btn px-3 py-1.5 border border-red-500 rounded-md text-sm text-red-600 hover:bg-red-50 transition-colors {% if ad.status == 'rejected' %}bg-red-50{% endif %}">
             Reject
           </button>
@@ -120,7 +125,7 @@
     </div>
 
     <!-- Grid View -->
-    <div id="grid-view" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div id="grid-view" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
       {% for ad in ads %}
       <div class="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
            data-ad-id="{{ ad.id }}">
@@ -152,22 +157,24 @@
           <!-- Actions -->
           <div class="flex items-center space-x-2 mt-3">
             <a href="{% url 'campaigns:ad_detail' campaign.id ad.id %}"
-               class="flex-1 text-center px-2 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-100 transition-colors">
+               class="flex-1 text-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
               Edit
             </a>
             <button type="button"
-                    onclick="approveAd({{ ad.id }})"
-                    class="approve-btn px-2 py-1.5 border border-green-500 rounded-md text-xs text-green-600 hover:bg-green-50 transition-colors {% if ad.status == 'approved' %}bg-green-50{% endif %}"
+                    onclick="approveAd({{ ad.id }}, event)"
+                    class="approve-btn flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors
+                      {% if ad.status == 'approved' %}bg-green-500 text-white border-2 border-green-600{% else %}border border-green-500 text-green-600 hover:bg-green-50{% endif %}"
                     title="Approve">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
               </svg>
             </button>
             <button type="button"
-                    onclick="rejectAd({{ ad.id }})"
-                    class="reject-btn px-2 py-1.5 border border-red-500 rounded-md text-xs text-red-600 hover:bg-red-50 transition-colors {% if ad.status == 'rejected' %}bg-red-50{% endif %}"
+                    onclick="rejectAd({{ ad.id }}, event)"
+                    class="reject-btn flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors
+                      {% if ad.status == 'rejected' %}bg-red-500 text-white border-2 border-red-600{% else %}border border-red-500 text-red-600 hover:bg-red-50{% endif %}"
                     title="Reject">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </button>
@@ -185,20 +192,11 @@
 {% endblock content %}
 
 {% block extra_js %}
+<!-- Hidden CSRF token for AJAX requests -->
+{% csrf_token %}
 <script>
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
+function getCSRFToken() {
+  return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
 function setView(view) {
@@ -240,60 +238,80 @@ function updateAdStatus(adId, newStatus) {
 
     if (!badge) return;
 
-    // Remove old status colors
+    // Remove old status colors from badge
     badge.classList.remove('bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-gray-100', 'text-gray-600');
+
+    // Reset button styles
+    if (approveBtn) {
+      approveBtn.classList.remove('bg-green-500', 'text-white', 'border-2', 'border-green-600', 'bg-green-50');
+      approveBtn.classList.add('border', 'border-green-500', 'text-green-600');
+    }
+    if (rejectBtn) {
+      rejectBtn.classList.remove('bg-red-500', 'text-white', 'border-2', 'border-red-600', 'bg-red-50');
+      rejectBtn.classList.add('border', 'border-red-500', 'text-red-600');
+    }
 
     if (newStatus === 'approved') {
       badge.classList.add('bg-green-100', 'text-green-700');
       badge.textContent = 'Approved';
-      if (approveBtn) approveBtn.classList.add('bg-green-50');
-      if (rejectBtn) rejectBtn.classList.remove('bg-red-50');
+      if (approveBtn) {
+        approveBtn.classList.remove('border', 'border-green-500', 'text-green-600');
+        approveBtn.classList.add('bg-green-500', 'text-white', 'border-2', 'border-green-600');
+      }
     } else if (newStatus === 'rejected') {
       badge.classList.add('bg-red-100', 'text-red-700');
       badge.textContent = 'Rejected';
-      if (rejectBtn) rejectBtn.classList.add('bg-red-50');
-      if (approveBtn) approveBtn.classList.remove('bg-green-50');
+      if (rejectBtn) {
+        rejectBtn.classList.remove('border', 'border-red-500', 'text-red-600');
+        rejectBtn.classList.add('bg-red-500', 'text-white', 'border-2', 'border-red-600');
+      }
     } else {
       badge.classList.add('bg-gray-100', 'text-gray-600');
       badge.textContent = 'Pending';
-      if (approveBtn) approveBtn.classList.remove('bg-green-50');
-      if (rejectBtn) rejectBtn.classList.remove('bg-red-50');
     }
   });
 }
 
-function approveAd(adId) {
+function approveAd(adId, event) {
+  if (event) event.stopPropagation();
   fetch(`/app/ads/${adId}/approve/`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': getCSRFToken(),
       'Content-Type': 'application/json',
     },
   })
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  })
   .then(data => {
     if (data.status === 'success') {
       updateAdStatus(adId, data.new_status);
     }
   })
-  .catch(error => console.error('Error:', error));
+  .catch(error => console.error('Approve error:', error));
 }
 
-function rejectAd(adId) {
+function rejectAd(adId, event) {
+  if (event) event.stopPropagation();
   fetch(`/app/ads/${adId}/reject/`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': getCSRFToken(),
       'Content-Type': 'application/json',
     },
   })
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  })
   .then(data => {
     if (data.status === 'success') {
       updateAdStatus(adId, data.new_status);
     }
   })
-  .catch(error => console.error('Error:', error));
+  .catch(error => console.error('Reject error:', error));
 }
 </script>
 {% endblock extra_js %}
