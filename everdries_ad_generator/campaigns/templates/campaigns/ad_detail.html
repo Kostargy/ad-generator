@@ -45,9 +45,9 @@
         <h1 class="text-2xl font-semibold text-gray-800 mb-4">{{ ad.headline }}</h1>
 
         <!-- Image -->
-        <div class="mb-6">
+        <div class="mb-6 relative" id="image-container">
           {% if ad.image %}
-            <img src="{{ ad.image.url }}" alt="{{ ad.headline }}"
+            <img src="{{ ad.image.url }}" alt="{{ ad.headline }}" id="ad-image"
                  class="max-w-full h-auto rounded-lg border border-gray-200">
           {% else %}
             <div class="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
@@ -56,6 +56,16 @@
               </svg>
             </div>
           {% endif %}
+          <!-- Loading Overlay -->
+          <div id="revision-loading" class="hidden absolute inset-0 bg-white bg-opacity-80 rounded-lg flex items-center justify-center">
+            <div class="text-center">
+              <svg class="animate-spin h-10 w-10 text-green-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p class="text-sm text-gray-600">Generating revision...</p>
+            </div>
+          </div>
         </div>
 
         <!-- Description -->
@@ -131,22 +141,44 @@
 {% endblock content %}
 
 {% block extra_js %}
+{% csrf_token %}
 <script>
 const adId = {{ ad.id }};
+let pollingInterval = null;
+let seenMessageIds = new Set();
+let lastImageUpdate = '{{ ad.updated_at.isoformat }}';
 
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
+// Track existing messages
+{% for message in messages %}
+seenMessageIds.add({{ message.id }});
+{% endfor %}
+
+function getCSRFToken() {
+  return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+function showLoading() {
+  const overlay = document.getElementById('revision-loading');
+  if (overlay) overlay.classList.remove('hidden');
+
+  // Disable send button
+  const sendBtn = document.querySelector('#message-form button[type="submit"]');
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
   }
-  return cookieValue;
+}
+
+function hideLoading() {
+  const overlay = document.getElementById('revision-loading');
+  if (overlay) overlay.classList.add('hidden');
+
+  // Enable send button
+  const sendBtn = document.querySelector('#message-form button[type="submit"]');
+  if (sendBtn) {
+    sendBtn.disabled = false;
+    sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
 }
 
 function updateStatusBadge(status) {
@@ -169,7 +201,7 @@ function approveAd() {
   fetch(`/app/ads/${adId}/approve/`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': getCSRFToken(),
       'Content-Type': 'application/json',
     },
   })
@@ -186,7 +218,7 @@ function rejectAd() {
   fetch(`/app/ads/${adId}/reject/`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': getCSRFToken(),
       'Content-Type': 'application/json',
     },
   })
@@ -206,6 +238,9 @@ function formatDate(isoString) {
 }
 
 function addMessageToUI(message) {
+  if (seenMessageIds.has(message.id)) return;
+  seenMessageIds.add(message.id);
+
   const container = document.getElementById('messages-container');
   const emptyMsg = document.getElementById('empty-messages');
   if (emptyMsg) {
@@ -215,6 +250,7 @@ function addMessageToUI(message) {
   const isUser = message.role === 'user';
   const div = document.createElement('div');
   div.className = isUser ? 'ml-8' : 'mr-8';
+  div.setAttribute('data-msg-id', message.id);
   div.innerHTML = `
     <div class="${isUser ? 'bg-blue-50 text-blue-800' : 'bg-gray-100 text-gray-800'} rounded-lg p-3 text-sm">
       ${message.content}
@@ -229,6 +265,64 @@ function addMessageToUI(message) {
   container.scrollTop = container.scrollHeight;
 }
 
+function refreshImage(imageUrl, imageUpdated) {
+  if (imageUpdated && imageUpdated !== lastImageUpdate) {
+    const img = document.getElementById('ad-image');
+    if (img && imageUrl) {
+      // Add cache buster to force reload
+      img.src = imageUrl + '?t=' + Date.now();
+      lastImageUpdate = imageUpdated;
+    }
+  }
+}
+
+function pollForResponse() {
+  if (pollingInterval) return; // Already polling
+
+  pollingInterval = setInterval(() => {
+    fetch(`/app/ads/${adId}/revision-status/`)
+    .then(response => response.json())
+    .then(data => {
+      let gotAssistantResponse = false;
+
+      // Check for new messages
+      data.messages.forEach(msg => {
+        if (!seenMessageIds.has(msg.id)) {
+          addMessageToUI(msg);
+          if (msg.role === 'assistant') {
+            gotAssistantResponse = true;
+          }
+        }
+      });
+
+      // If we got an assistant response, stop polling and refresh image
+      if (gotAssistantResponse) {
+        stopPolling();
+        hideLoading();
+        refreshImage(data.image_url, data.image_updated);
+      }
+    })
+    .catch(error => {
+      console.error('Polling error:', error);
+    });
+  }, 2000);  // Poll every 2 seconds
+
+  // Stop polling after 3 minutes max
+  setTimeout(() => {
+    if (pollingInterval) {
+      stopPolling();
+      hideLoading();
+    }
+  }, 180000);
+}
+
+function stopPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
 function sendMessage(event) {
   event.preventDefault();
   const input = document.getElementById('message-input');
@@ -239,7 +333,7 @@ function sendMessage(event) {
   fetch(`/app/ads/${adId}/message/`, {
     method: 'POST',
     headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': getCSRFToken(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ content: content }),
@@ -249,6 +343,12 @@ function sendMessage(event) {
     if (data.id) {
       addMessageToUI(data);
       input.value = '';
+
+      // Show loading and start polling if revision was started
+      if (data.revision_started) {
+        showLoading();
+        pollForResponse();
+      }
     } else if (data.error) {
       console.error('Error:', data.error);
     }

@@ -119,7 +119,7 @@ def ad_reject(request, ad_id):
 @login_required
 @require_POST
 def ad_message(request, ad_id):
-    """Add a chat message to an ad via AJAX."""
+    """Add a chat message to an ad and trigger revision."""
     ad = get_object_or_404(Ad, id=ad_id, generator__campaign__created_by=request.user)
 
     try:
@@ -135,14 +135,50 @@ def ad_message(request, ad_id):
             content=content,
         )
 
+        # Trigger revision task
+        from .tasks import revise_ad_task
+
+        revise_ad_task.delay(ad.id, message.id)
+
         return JsonResponse({
             "id": message.id,
             "role": message.role,
             "content": message.content,
             "created_at": message.created_at.isoformat(),
+            "revision_started": True,
         })
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+
+@login_required
+def ad_revision_status(request, ad_id):
+    """Check revision status and get new messages."""
+    ad = get_object_or_404(Ad, id=ad_id, generator__campaign__created_by=request.user)
+
+    # Get messages after a certain timestamp
+    since = request.GET.get("since")
+    messages_qs = ad.messages.all()
+    if since:
+        from django.utils.dateparse import parse_datetime
+
+        since_dt = parse_datetime(since)
+        if since_dt:
+            messages_qs = messages_qs.filter(created_at__gt=since_dt)
+
+    return JsonResponse({
+        "messages": [
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in messages_qs
+        ],
+        "image_url": ad.image.url if ad.image else None,
+        "image_updated": ad.updated_at.isoformat(),
+    })
 
 
 @login_required

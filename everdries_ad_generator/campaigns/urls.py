@@ -33,6 +33,7 @@ urlpatterns = [
     path("ads/<int:ad_id>/approve/", views.ad_approve, name="ad_approve"),
     path("ads/<int:ad_id>/reject/", views.ad_reject, name="ad_reject"),
     path("ads/<int:ad_id>/message/", views.ad_message, name="ad_message"),
+    path("ads/<int:ad_id>/revision-status/", views.ad_revision_status, name="ad_revision_status"),
 
     # Personas (AJAX)
     path("personas/create/", views.persona_create, name="persona_create"),

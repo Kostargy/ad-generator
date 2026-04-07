@@ -1,11 +1,12 @@
 """
-Celery tasks for async image generation.
+Celery tasks for async image generation and revision.
 """
 
 import logging
 import traceback
 
 from celery import shared_task
+from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +71,75 @@ def generate_ads_task(self, generator_id: int) -> dict:
 
         # Retry with backoff
         raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def revise_ad_task(self, ad_id: int, message_id: int) -> dict:
+    """Revise an ad image based on user instructions."""
+    print(f"\n{'='*60}")
+    print(f"[CELERY TASK] revise_ad_task started")
+    print(f"[CELERY TASK] Ad ID: {ad_id}, Message ID: {message_id}")
+    print(f"[CELERY TASK] Task ID: {self.request.id}")
+    print(f"{'='*60}\n")
+
+    from everdries_ad_generator.campaigns.models import Ad, AdMessage
+    from everdries_ad_generator.campaigns.services.revision_service import RevisionService
+
+    try:
+        ad = Ad.objects.get(id=ad_id)
+        message = AdMessage.objects.get(id=message_id)
+        print(f"[CELERY TASK] Found ad: {ad.headline}")
+        print(f"[CELERY TASK] Instructions: {message.content[:100]}")
+    except (Ad.DoesNotExist, AdMessage.DoesNotExist) as e:
+        print(f"[CELERY TASK] ERROR: {e}")
+        return {"status": "error", "message": str(e)}
+
+    try:
+        print(f"[CELERY TASK] Creating RevisionService...")
+        service = RevisionService(ad)
+
+        print(f"[CELERY TASK] Starting revision...")
+        revised_path = service.run(message.content)
+
+        # Update ad with new image
+        print(f"[CELERY TASK] Saving revised image...")
+        with open(revised_path, "rb") as f:
+            ad.image.save(f"revised_{ad.id}.png", ContentFile(f.read()), save=True)
+
+        # Create assistant response
+        AdMessage.objects.create(
+            ad=ad,
+            role=AdMessage.ROLE_ASSISTANT,
+            content="Done! I've updated the image based on your request.",
+        )
+
+        print(f"\n{'='*60}")
+        print(f"[CELERY TASK] SUCCESS: Image revised")
+        print(f"{'='*60}\n")
+
+        return {
+            "status": "success",
+            "ad_id": ad_id,
+            "image_url": ad.image.url,
+        }
+
+    except Exception as exc:
+        print(f"\n{'='*60}")
+        print(f"[CELERY TASK] ERROR: {exc}")
+        print(f"[CELERY TASK] Traceback:")
+        traceback.print_exc()
+        print(f"{'='*60}\n")
+
+        # Create error response message
+        AdMessage.objects.create(
+            ad=ad,
+            role=AdMessage.ROLE_ASSISTANT,
+            content=f"Sorry, I couldn't complete the revision: {str(exc)}",
+        )
+
+        # Don't retry on revision errors - user can send another message
+        return {
+            "status": "error",
+            "ad_id": ad_id,
+            "error": str(exc),
+        }
