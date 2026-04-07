@@ -25,22 +25,46 @@
     <!-- Card Header -->
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-lg font-medium text-gray-800">Ads</h2>
-      <div class="flex space-x-2">
-        <button type="button"
-                class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-          Export
-        </button>
-        <button type="button"
-                class="px-4 py-2 border border-gray-200 rounded-md text-sm text-gray-400 cursor-not-allowed"
-                disabled
-                title="Ads are created by the generator">
-          + new Ad
-        </button>
+      <div class="flex items-center space-x-4">
+        <!-- View Toggle -->
+        <div class="flex border border-gray-300 rounded-md overflow-hidden">
+          <button type="button"
+                  id="list-view-btn"
+                  onclick="setView('list')"
+                  class="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors bg-gray-100"
+                  title="List view">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <button type="button"
+                  id="grid-view-btn"
+                  onclick="setView('grid')"
+                  class="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-l border-gray-300"
+                  title="Grid view">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="flex space-x-2">
+          <button type="button"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+            Export
+          </button>
+          <button type="button"
+                  class="px-4 py-2 border border-gray-200 rounded-md text-sm text-gray-400 cursor-not-allowed"
+                  disabled
+                  title="Ads are created by the generator">
+            + new Ad
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Ads List -->
-    <div class="space-y-4">
+    <!-- List View -->
+    <div id="list-view" class="space-y-4">
       {% for ad in ads %}
       <div class="flex items-center border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
            data-ad-id="{{ ad.id }}">
@@ -62,7 +86,7 @@
           <h3 class="text-sm font-medium text-gray-800 truncate">{{ ad.headline }}</h3>
           <p class="text-xs text-gray-500 mt-1">{{ ad.generator.title }}</p>
           <!-- Status Badge -->
-          <span class="inline-block mt-2 px-2 py-0.5 text-xs rounded-full
+          <span class="inline-block mt-2 px-2 py-0.5 text-xs rounded-full status-badge
             {% if ad.status == 'approved' %}bg-green-100 text-green-700
             {% elif ad.status == 'rejected' %}bg-red-100 text-red-700
             {% else %}bg-gray-100 text-gray-600{% endif %}">
@@ -94,6 +118,68 @@
       </div>
       {% endfor %}
     </div>
+
+    <!-- Grid View -->
+    <div id="grid-view" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {% for ad in ads %}
+      <div class="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+           data-ad-id="{{ ad.id }}">
+        <!-- Image -->
+        <div class="aspect-square bg-gray-100 relative">
+          {% if ad.image %}
+            <img src="{{ ad.image.url }}" alt="{{ ad.headline }}" class="w-full h-full object-cover">
+          {% else %}
+            <div class="w-full h-full flex items-center justify-center text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          {% endif %}
+          <!-- Status Badge Overlay -->
+          <span class="absolute top-2 right-2 px-2 py-0.5 text-xs rounded-full status-badge
+            {% if ad.status == 'approved' %}bg-green-100 text-green-700
+            {% elif ad.status == 'rejected' %}bg-red-100 text-red-700
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{ ad.get_status_display }}
+          </span>
+        </div>
+
+        <!-- Content -->
+        <div class="p-4">
+          <h3 class="text-sm font-medium text-gray-800 truncate">{{ ad.headline }}</h3>
+          <p class="text-xs text-gray-500 mt-1 truncate">{{ ad.generator.title }}</p>
+
+          <!-- Actions -->
+          <div class="flex items-center space-x-2 mt-3">
+            <a href="{% url 'campaigns:ad_detail' campaign.id ad.id %}"
+               class="flex-1 text-center px-2 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-100 transition-colors">
+              Edit
+            </a>
+            <button type="button"
+                    onclick="approveAd({{ ad.id }})"
+                    class="approve-btn px-2 py-1.5 border border-green-500 rounded-md text-xs text-green-600 hover:bg-green-50 transition-colors {% if ad.status == 'approved' %}bg-green-50{% endif %}"
+                    title="Approve">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </button>
+            <button type="button"
+                    onclick="rejectAd({{ ad.id }})"
+                    class="reject-btn px-2 py-1.5 border border-red-500 rounded-md text-xs text-red-600 hover:bg-red-50 transition-colors {% if ad.status == 'rejected' %}bg-red-50{% endif %}"
+                    title="Reject">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-span-full py-12 text-center text-gray-500">
+        No ads yet. Ads will appear here once generated.
+      </div>
+      {% endfor %}
+    </div>
   </div>
 </div>
 {% endblock content %}
@@ -115,32 +201,65 @@ function getCookie(name) {
   return cookieValue;
 }
 
-function updateAdStatus(adId, newStatus) {
-  const adRow = document.querySelector(`[data-ad-id="${adId}"]`);
-  if (!adRow) return;
+function setView(view) {
+  const listView = document.getElementById('list-view');
+  const gridView = document.getElementById('grid-view');
+  const listBtn = document.getElementById('list-view-btn');
+  const gridBtn = document.getElementById('grid-view-btn');
 
-  const badge = adRow.querySelector('.rounded-full');
-  const approveBtn = adRow.querySelector('.approve-btn');
-  const rejectBtn = adRow.querySelector('.reject-btn');
-
-  // Update badge
-  badge.className = 'inline-block mt-2 px-2 py-0.5 text-xs rounded-full';
-  if (newStatus === 'approved') {
-    badge.classList.add('bg-green-100', 'text-green-700');
-    badge.textContent = 'Approved';
-    approveBtn.classList.add('bg-green-50');
-    rejectBtn.classList.remove('bg-red-50');
-  } else if (newStatus === 'rejected') {
-    badge.classList.add('bg-red-100', 'text-red-700');
-    badge.textContent = 'Rejected';
-    rejectBtn.classList.add('bg-red-50');
-    approveBtn.classList.remove('bg-green-50');
+  if (view === 'grid') {
+    listView.classList.add('hidden');
+    gridView.classList.remove('hidden');
+    listBtn.classList.remove('bg-gray-100');
+    gridBtn.classList.add('bg-gray-100');
   } else {
-    badge.classList.add('bg-gray-100', 'text-gray-600');
-    badge.textContent = 'Pending';
-    approveBtn.classList.remove('bg-green-50');
-    rejectBtn.classList.remove('bg-red-50');
+    gridView.classList.add('hidden');
+    listView.classList.remove('hidden');
+    gridBtn.classList.remove('bg-gray-100');
+    listBtn.classList.add('bg-gray-100');
   }
+
+  // Save preference
+  localStorage.setItem('adsViewMode', view);
+}
+
+// Restore view preference on load
+document.addEventListener('DOMContentLoaded', function() {
+  const savedView = localStorage.getItem('adsViewMode');
+  if (savedView) {
+    setView(savedView);
+  }
+});
+
+function updateAdStatus(adId, newStatus) {
+  // Update in both views
+  document.querySelectorAll(`[data-ad-id="${adId}"]`).forEach(adEl => {
+    const badge = adEl.querySelector('.status-badge');
+    const approveBtn = adEl.querySelector('.approve-btn');
+    const rejectBtn = adEl.querySelector('.reject-btn');
+
+    if (!badge) return;
+
+    // Remove old status colors
+    badge.classList.remove('bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-gray-100', 'text-gray-600');
+
+    if (newStatus === 'approved') {
+      badge.classList.add('bg-green-100', 'text-green-700');
+      badge.textContent = 'Approved';
+      if (approveBtn) approveBtn.classList.add('bg-green-50');
+      if (rejectBtn) rejectBtn.classList.remove('bg-red-50');
+    } else if (newStatus === 'rejected') {
+      badge.classList.add('bg-red-100', 'text-red-700');
+      badge.textContent = 'Rejected';
+      if (rejectBtn) rejectBtn.classList.add('bg-red-50');
+      if (approveBtn) approveBtn.classList.remove('bg-green-50');
+    } else {
+      badge.classList.add('bg-gray-100', 'text-gray-600');
+      badge.textContent = 'Pending';
+      if (approveBtn) approveBtn.classList.remove('bg-green-50');
+      if (rejectBtn) rejectBtn.classList.remove('bg-red-50');
+    }
+  });
 }
 
 function approveAd(adId) {
