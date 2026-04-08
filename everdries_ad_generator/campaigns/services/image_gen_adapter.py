@@ -38,15 +38,15 @@ class GenerationPrompt:
             "style_variant": self.style_variant,
         }
 
-# Dimension to aspect ratio mapping. Values must be one of Gemini's
-# supported ratios: 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4,
-# 8:1, 9:16, 16:9, 21:9. 1200x628 (~1.91:1) is approximated as 16:9.
+# Dimension to aspect ratio mapping. 16:9 is intentionally absent —
+# gemini-2.5-flash-image returns IMAGE_OTHER on every request when
+# asked for 16:9 with reference photos. Any stale generator pointing
+# at a removed dimension falls back to DEFAULT_ASPECT_RATIO (1:1),
+# which generates successfully.
 DIMENSION_TO_ASPECT = {
     "1080x1080": "1:1",
     "1080x1350": "4:5",
     "1080x1920": "9:16",
-    "1200x628": "16:9",
-    "1920x1080": "16:9",
     "1200x1200": "1:1",
 }
 
