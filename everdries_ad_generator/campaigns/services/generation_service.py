@@ -33,6 +33,10 @@ class GenerationService:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.critic = ImageCritic()
         self.image_generator: ImageGenerator | None = None
+        # Streaming state: Ad records keyed by their batch index. Populated
+        # by the on_image_saved callback during generate_batch, then read
+        # by _critique_and_revise to update each row in place.
+        self._ads_by_index: dict[int, "Ad"] = {}
         # Settings loaded from database
         self._gemini_model: str | None = None
         self._primary_provider: str = "gemini"
@@ -99,18 +103,23 @@ class GenerationService:
                 self.generator.id,
             )
 
-            # Step 3: Generate images (async part only)
+            # Step 3: Generate images. Each successful image is persisted as
+            # an Ad row immediately via the on_image_saved callback inside
+            # generate_batch, so partial successes are visible in the UI
+            # even if the worker dies mid-run.
             generated = asyncio.run(self._generate_images(prompts))
 
             # Step 4: Critique & auto-revise images
             logger.info("Critiquing %d images...", len(generated))
             generated, critiques = self._critique_and_revise(generated)
 
-            # Step 5: Create Ad records (sync, after async)
+            # Step 5: Update existing Ad rows with critique data (and the
+            # revised image, if critique produced one).
             for img, critique in zip(generated, critiques):
-                ad = self._create_ad(img, critique)
-                if ad:
-                    ads_created.append(ad)
+                index = self._index_of(img)
+                self._update_ad_with_critique(index, img, critique)
+
+            ads_created = list(self._ads_by_index.values())
 
             # Step 6: Mark completed or failed based on results
             if ads_created:
@@ -137,7 +146,11 @@ class GenerationService:
         return ads_created
 
     async def _generate_images(self, prompts: list) -> list[GeneratedImage]:
-        """Generate images asynchronously (no Django ORM calls here)."""
+        """Generate images asynchronously.
+
+        The on_image_saved callback runs in a thread executor (see
+        ImageGenerator.generate_batch), so it can safely use sync Django ORM.
+        """
         self.image_generator = ImageGenerator(
             output_dir=self.output_dir,
             checkpoint_dir=self.output_dir / "checkpoints",
@@ -145,7 +158,27 @@ class GenerationService:
             primary_provider=self._primary_provider,
             fallback_provider=self._fallback_provider,
         )
-        return await self.image_generator.generate_batch(prompts=prompts, dry_run=False)
+        return await self.image_generator.generate_batch(
+            prompts=prompts,
+            dry_run=False,
+            on_image_saved=self._create_ad_for_index,
+        )
+
+    def _create_ad_for_index(self, index: int, gen_image: GeneratedImage) -> None:
+        """Callback fired by generate_batch the moment an image lands on disk."""
+        ad = self._create_ad(gen_image, critique=None)
+        if ad:
+            self._ads_by_index[index] = ad
+            logger.info("Streamed Ad %s for image index %d", ad.id, index)
+
+    def _index_of(self, gen_image: GeneratedImage) -> int:
+        """Recover the batch index from a GeneratedImage's generation_id."""
+        gid = gen_image.generation_id or ""
+        # generation_id format: "gen-0007"
+        try:
+            return int(gid.split("-")[-1])
+        except (ValueError, IndexError):
+            return -1
 
     def _critique_and_revise(
         self, images: list[GeneratedImage], max_revisions: int = 2
@@ -294,6 +327,56 @@ class GenerationService:
         )
 
         return final_images, critiques
+
+    def _update_ad_with_critique(
+        self,
+        index: int,
+        gen_image: GeneratedImage,
+        critique: CritiqueResult,
+    ) -> None:
+        """Update the streamed Ad row with critique data + revised image.
+
+        If the streaming callback never managed to create the Ad (e.g. it
+        raised), fall back to creating it now from scratch so we don't lose
+        the image entirely.
+        """
+        from everdries_ad_generator.campaigns.models import Ad  # noqa: F401
+
+        ad = self._ads_by_index.get(index)
+        if ad is None:
+            ad = self._create_ad(gen_image, critique)
+            if ad and index >= 0:
+                self._ads_by_index[index] = ad
+            return
+
+        # If critique produced a revised image, swap the file on the Ad row.
+        source = Path(gen_image.image_path)
+        try:
+            current_name = Path(ad.image.name).name if ad.image else ""
+        except Exception:
+            current_name = ""
+        if source.exists() and source.name != current_name:
+            try:
+                with open(source, "rb") as f:
+                    ad.image.save(
+                        f"ad_{self.generator.id}_{source.name}",
+                        File(f),
+                        save=False,
+                    )
+            except Exception as e:
+                logger.warning("Failed to swap revised image on Ad %s: %s", ad.id, e)
+
+        revision_count = getattr(critique, "_revision_count", 0)
+        ad.critique_score = critique.overall_score
+        ad.critique_passed = critique.passed
+        ad.critique_summary = critique.summary
+        ad.critique_data = critique.to_dict()
+        ad.was_auto_revised = revision_count > 0
+        ad.revision_count = revision_count
+        try:
+            ad.save()
+        except Exception as e:
+            logger.error("Failed to save critique data on Ad %s: %s", ad.id, e)
 
     def _create_ad(
         self, gen_image: GeneratedImage, critique: CritiqueResult | None = None

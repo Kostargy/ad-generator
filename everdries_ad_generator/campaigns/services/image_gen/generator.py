@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 from zoneinfo import ZoneInfo
 
 from PIL import Image
@@ -206,8 +206,15 @@ class ImageGenerator:
         self,
         prompts: list["GenerationPrompt"],
         dry_run: bool = False,
+        on_image_saved: Callable[[int, GeneratedImage], None] | None = None,
     ) -> list[GeneratedImage]:
-        """Generate images for a batch of prompts."""
+        """Generate images for a batch of prompts.
+
+        If `on_image_saved` is provided, it is invoked synchronously (in a
+        thread executor so it can safely call sync Django ORM) once per
+        successful image immediately after the file lands on disk. Failures
+        in the callback are logged but never abort generation.
+        """
         results: list[GeneratedImage] = []
         failed = 0
 
@@ -234,6 +241,13 @@ class ImageGenerator:
             self._save_metadata(i, prompt, result)
             results.append(result)
             self.checkpoint.mark_completed(i, str(result.image_path))
+
+            if on_image_saved is not None:
+                try:
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(None, on_image_saved, i, result)
+                except Exception as cb_exc:
+                    logger.warning("on_image_saved callback failed: %s", cb_exc)
 
             # Pause between batches
             if (i + 1) % BATCH_SIZE == 0 and i + 1 < len(prompts):
