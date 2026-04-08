@@ -159,6 +159,7 @@ def revise_ad_task(self, ad_id: int, message_id: int) -> dict:
             ad=ad,
             role=AdMessage.ROLE_ASSISTANT,
             content=f"Sorry, I couldn't complete the revision: {_friendly_error_message(exc)}",
+            is_error=True,
         )
 
         # Don't retry on revision errors - user can send another message

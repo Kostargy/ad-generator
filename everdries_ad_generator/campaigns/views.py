@@ -241,6 +241,7 @@ def ad_revision_status(request, ad_id):
                 "id": m.id,
                 "role": m.role,
                 "content": m.content,
+                "is_error": m.is_error,
                 "created_at": m.created_at.isoformat(),
             }
             for m in messages_qs

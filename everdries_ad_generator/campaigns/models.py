@@ -89,6 +89,24 @@ class Asset(models.Model):
         return self.name
 
 
+class StyleReference(Asset):
+    """Proxy of Asset filtered to style references — for Django admin grouping."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Style Reference"
+        verbose_name_plural = "Style References"
+
+
+class ProductReference(Asset):
+    """Proxy of Asset filtered to product references — for Django admin grouping."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Product Reference"
+        verbose_name_plural = "Product References"
+
+
 class Generator(models.Model):
     """A generator within a campaign."""
 
@@ -319,6 +337,7 @@ class AdMessage(models.Model):
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     content = models.TextField()
+    is_error = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
