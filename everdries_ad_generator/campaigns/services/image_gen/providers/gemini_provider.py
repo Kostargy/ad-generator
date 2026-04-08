@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 # Hardcoded config values
 DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview"
-TEMPERATURE = 0.4
+# Gemini 3 image models suffer severe latency degradation (5–30 min stalls)
+# when temperature is below 1.0. Keep this at 1.0.
+TEMPERATURE = 1.0
 MAX_RETRIES = 3
 RETRY_DELAY = 5
 
@@ -191,6 +193,7 @@ class GeminiProvider(ImageProvider):
 
         gen_config = types.GenerateContentConfig(
             response_modalities=["IMAGE"],
+            temperature=TEMPERATURE,
             image_config=types.ImageConfig(**image_config_kwargs) if image_config_kwargs else None,
         )
 
