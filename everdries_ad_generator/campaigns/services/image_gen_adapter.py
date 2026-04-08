@@ -4,12 +4,13 @@ Adapter to convert Django Generator model to GenerationPrompt objects.
 
 from __future__ import annotations
 
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from everdries_ad_generator.campaigns.models import Generator
+    from everdries_ad_generator.campaigns.models import Asset, Generator
 
 
 @dataclass
@@ -70,7 +71,24 @@ class ImageGenAdapter:
     def __init__(self, generator: "Generator"):
         self.generator = generator
         self.campaign = generator.campaign
+        # Holds downloaded copies of remote (S3) asset files for the lifetime
+        # of this adapter; auto-cleaned when the adapter is garbage collected.
+        self._tmp_dir = tempfile.TemporaryDirectory(prefix="image_gen_assets_")
         self.config = self._extract_config()
+
+    def _materialize_asset(self, asset: "Asset") -> Path:
+        """Return a local Path for an Asset, downloading from remote storage if needed."""
+        try:
+            # Local filesystem storage exposes .path directly.
+            return Path(asset.image.path)
+        except NotImplementedError:
+            # Remote storage (e.g. S3): download to a temp file.
+            suffix = Path(asset.image.name).suffix
+            local_path = Path(self._tmp_dir.name) / f"{asset.pk}{suffix}"
+            with asset.image.open("rb") as src, local_path.open("wb") as dst:
+                for chunk in src.chunks():
+                    dst.write(chunk)
+            return local_path
 
     def _extract_config(self) -> GeneratorConfig:
         """Extract config from Generator and Campaign models."""
@@ -84,12 +102,12 @@ class ImageGenAdapter:
             ],
             brief=self.generator.brief or "",
             product_reference_paths=[
-                Path(asset.image.path)
+                self._materialize_asset(asset)
                 for asset in self.generator.product_references.all()
                 if asset.image
             ],
             style_reference_paths=[
-                Path(asset.image.path)
+                self._materialize_asset(asset)
                 for asset in self.generator.style_references.all()
                 if asset.image
             ],
