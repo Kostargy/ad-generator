@@ -442,30 +442,96 @@ def generator_edit(request, campaign_id, generator_id):
 
 
 @login_required
-@require_POST
+def persona_list(request):
+    """List all personas for the current user."""
+    personas = CustomerPersona.objects.filter(created_by=request.user)
+    return render(request, "campaigns/persona_list.html", {
+        "personas": personas,
+        "active_nav": "personas",
+    })
+
+
+@login_required
 def persona_create(request):
-    """Create a new customer persona via AJAX."""
-    try:
-        data = json.loads(request.body)
-        name = data.get("name", "").strip()
-        description = data.get("description", "").strip()
+    """Create a new customer persona via AJAX or form POST."""
+    # Check if AJAX request (JSON content type)
+    if request.content_type == "application/json":
+        try:
+            data = json.loads(request.body)
+            name = data.get("name", "").strip()
+            description = data.get("description", "").strip()
+
+            if not name:
+                return JsonResponse({"error": "Name is required."}, status=400)
+
+            persona = CustomerPersona.objects.create(
+                name=name,
+                description=description,
+                created_by=request.user,
+            )
+
+            return JsonResponse({
+                "id": persona.id,
+                "name": persona.name,
+                "description": persona.description,
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+    # Form POST handling
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
 
         if not name:
-            return JsonResponse({"error": "Name is required."}, status=400)
+            messages.error(request, "Name is required.")
+            return redirect("campaigns:persona_list")
 
-        persona = CustomerPersona.objects.create(
+        CustomerPersona.objects.create(
             name=name,
             description=description,
             created_by=request.user,
         )
+        messages.success(request, f"Persona '{name}' created.")
+        return redirect("campaigns:persona_list")
 
-        return JsonResponse({
-            "id": persona.id,
-            "name": persona.name,
-            "description": persona.description,
-        })
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON."}, status=400)
+    # GET request - redirect to list
+    return redirect("campaigns:persona_list")
+
+
+@login_required
+def persona_edit(request, persona_id):
+    """Edit an existing persona."""
+    persona = get_object_or_404(CustomerPersona, id=persona_id, created_by=request.user)
+
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+
+        if not name:
+            messages.error(request, "Name is required.")
+            return redirect("campaigns:persona_edit", persona_id=persona_id)
+
+        persona.name = name
+        persona.description = description
+        persona.save()
+        messages.success(request, f"Persona '{name}' updated.")
+        return redirect("campaigns:persona_list")
+
+    return render(request, "campaigns/persona_edit.html", {
+        "persona": persona,
+        "active_nav": "personas",
+    })
+
+
+@login_required
+@require_POST
+def persona_delete(request, persona_id):
+    """Delete a persona via AJAX."""
+    persona = get_object_or_404(CustomerPersona, id=persona_id, created_by=request.user)
+    name = persona.name
+    persona.delete()
+    return JsonResponse({"status": "success", "message": f"Persona '{name}' deleted."})
 
 
 @login_required

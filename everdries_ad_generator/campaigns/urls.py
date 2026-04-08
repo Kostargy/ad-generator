@@ -35,8 +35,11 @@ urlpatterns = [
     path("ads/<int:ad_id>/message/", views.ad_message, name="ad_message"),
     path("ads/<int:ad_id>/revision-status/", views.ad_revision_status, name="ad_revision_status"),
 
-    # Personas (AJAX)
+    # Personas
+    path("personas/", views.persona_list, name="persona_list"),
     path("personas/create/", views.persona_create, name="persona_create"),
+    path("personas/<int:persona_id>/edit/", views.persona_edit, name="persona_edit"),
+    path("personas/<int:persona_id>/delete/", views.persona_delete, name="persona_delete"),
 
     # Assets (AJAX)
     path("assets/upload/", views.asset_upload, name="asset_upload"),
