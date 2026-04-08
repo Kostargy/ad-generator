@@ -55,6 +55,7 @@
 
         <div class="flex space-x-2">
           <button type="button"
+                  data-export-btn
                   class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
             Export
           </button>
@@ -313,5 +314,50 @@ function rejectAd(adId, event) {
   })
   .catch(error => console.error('Reject error:', error));
 }
+
+// Export button handler
+document.querySelector('[data-export-btn]').addEventListener('click', function() {
+  {% if selected_generator %}
+  const ids = [{{ selected_generator.id }}];
+  {% else %}
+  const ids = [{% for g in generators %}{{ g.id }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+  {% endif %}
+
+  if (ids.length === 0) {
+    alert('No generators to export.');
+    return;
+  }
+
+  fetch('{% url "campaigns:export_approved_images" campaign.id %}', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCSRFToken(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ generator_ids: ids }),
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('Export failed');
+    const disposition = r.headers.get('Content-Disposition');
+    let filename = 'export.zip';
+    if (disposition) {
+      const match = disposition.match(/filename="(.+)"/);
+      if (match) filename = match[1];
+    }
+    return r.blob().then(blob => ({ blob, filename }));
+  })
+  .then(({ blob, filename }) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  })
+  .catch(err => {
+    console.error('Export error:', err);
+    alert('Export failed. Make sure there are approved images to export.');
+  });
+});
 </script>
 {% endblock extra_js %}

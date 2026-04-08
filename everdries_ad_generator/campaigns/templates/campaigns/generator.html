@@ -27,6 +27,7 @@
       <h2 class="text-lg font-medium text-gray-800">Generators</h2>
       <div class="flex space-x-2">
         <button type="button"
+                data-export-btn
                 class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors">
           Export
         </button>
@@ -42,6 +43,9 @@
       <table class="w-full">
         <thead>
           <tr class="border-b border-gray-200">
+            <th class="w-10 py-3 px-4">
+              <input type="checkbox" id="select-all" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            </th>
             <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Generator Name</th>
             <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Status</th>
             <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Approved</th>
@@ -54,6 +58,9 @@
           <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
               data-generator-id="{{ generator.id }}"
               onclick="window.location='{% url 'campaigns:ads_list' campaign.id %}?generator={{ generator.id }}'">
+            <td class="py-4 px-4" onclick="event.stopPropagation()">
+              <input type="checkbox" data-generator-checkbox value="{{ generator.id }}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            </td>
             <td class="py-4 px-4 text-sm text-gray-800">{{ generator.title }}</td>
             <td class="py-4 px-4 text-sm text-center" data-status-cell>
               {% if generator.status == 'completed' %}
@@ -98,7 +105,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="py-8 text-center text-gray-500">
+            <td colspan="6" class="py-8 text-center text-gray-500">
               No generators yet. Click "+ new Generator" to create one.
             </td>
           </tr>
@@ -110,6 +117,57 @@
 </div>
 
 <script>
+// Select all checkbox
+document.getElementById('select-all').addEventListener('change', function() {
+  document.querySelectorAll('[data-generator-checkbox]').forEach(cb => {
+    cb.checked = this.checked;
+  });
+});
+
+// Export button handler
+document.querySelector('[data-export-btn]').addEventListener('click', function() {
+  const ids = Array.from(document.querySelectorAll('[data-generator-checkbox]:checked'))
+    .map(cb => parseInt(cb.value));
+
+  if (ids.length === 0) {
+    alert('Please select at least one generator to export.');
+    return;
+  }
+
+  // POST to export endpoint, handle ZIP download
+  fetch('{% url "campaigns:export_approved_images" campaign.id %}', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ generator_ids: ids }),
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('Export failed');
+    // Extract filename from Content-Disposition header
+    const disposition = r.headers.get('Content-Disposition');
+    let filename = 'export.zip';
+    if (disposition) {
+      const match = disposition.match(/filename="(.+)"/);
+      if (match) filename = match[1];
+    }
+    return r.blob().then(blob => ({ blob, filename }));
+  })
+  .then(({ blob, filename }) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  })
+  .catch(err => {
+    console.error('Export error:', err);
+    alert('Export failed. Make sure there are approved images to export.');
+  });
+});
+
 // Poll generator statuses every 60 seconds
 setInterval(pollGeneratorStatuses, 60000);
 

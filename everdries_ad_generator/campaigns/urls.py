@@ -18,6 +18,7 @@ urlpatterns = [
     # Product-scoped tabs
     path("products/<int:campaign_id>/generator/", views.generator_list, name="generator_list"),
     path("products/<int:campaign_id>/generator-statuses/", views.generator_statuses, name="generator_statuses"),
+    path("products/<int:campaign_id>/export/", views.export_approved_images, name="export_approved_images"),
     path("products/<int:campaign_id>/ads/", views.ads_list, name="ads_list"),
     # Keep old review URL as alias for backwards compatibility
     path("products/<int:campaign_id>/review/", views.ads_list, name="review"),

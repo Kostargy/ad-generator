@@ -1,7 +1,10 @@
 import json
+import zipfile
+from io import BytesIO
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import redirect
@@ -63,6 +66,52 @@ def generator_statuses(request, campaign_id):
         ]
     }
     return JsonResponse(data)
+
+
+@login_required
+@require_POST
+def export_approved_images(request, campaign_id):
+    """Export approved images from selected generators as ZIP."""
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+
+    data = json.loads(request.body)
+    generator_ids = data.get("generator_ids", [])
+
+    # Get approved ads from selected generators
+    ads = Ad.objects.filter(
+        generator__campaign=campaign,
+        generator_id__in=generator_ids,
+        status=Ad.STATUS_APPROVED,
+    ).exclude(image="").select_related("generator")
+
+    # Create ZIP in memory
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for ad in ads:
+            if ad.image:
+                ext = ad.image.name.split(".")[-1] if "." in ad.image.name else "png"
+                # Sanitize filename
+                safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in ad.generator.title)
+                safe_headline = "".join(c if c.isalnum() or c in " -_" else "_" for c in ad.headline)
+                filename = f"{safe_title}/{safe_headline}.{ext}"
+                zf.writestr(filename, ad.image.read())
+
+    buffer.seek(0)
+
+    # Build filename with generator name(s) and ad count
+    ads_count = ads.count()
+    generators_qs = Generator.objects.filter(id__in=generator_ids, campaign=campaign)
+    if generators_qs.count() == 1:
+        gen_name = generators_qs.first().title
+        safe_gen_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in gen_name)
+        filename = f"{safe_gen_name}_{ads_count}_ads.zip"
+    else:
+        safe_campaign_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in campaign.name)
+        filename = f"{safe_campaign_name}_{generators_qs.count()}_generators_{ads_count}_ads.zip"
+
+    response = HttpResponse(buffer, content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required
