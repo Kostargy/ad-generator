@@ -83,7 +83,7 @@ def ad_detail(request, campaign_id, ad_id):
         "active_tab": "ads",
         "campaign": campaign,
         "ad": ad,
-        "messages": messages_list,
+        "chat_messages": messages_list,
     }
     return render(request, "campaigns/ad_detail.html", context)
 

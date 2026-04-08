@@ -103,7 +103,7 @@
 
         <!-- Messages Container -->
         <div class="flex-grow overflow-y-auto p-4 space-y-4" id="messages-container">
-          {% for message in messages %}
+          {% for message in chat_messages %}
           <div class="{% if message.role == 'user' %}ml-8{% else %}mr-8{% endif %}">
             <div class="{% if message.role == 'user' %}bg-blue-50 text-blue-800{% else %}bg-gray-100 text-gray-800{% endif %} rounded-lg p-3 text-sm">
               {{ message.content }}
@@ -149,7 +149,7 @@ let seenMessageIds = new Set();
 let lastImageUpdate = '{{ ad.updated_at.isoformat }}';
 
 // Track existing messages
-{% for message in messages %}
+{% for message in chat_messages %}
 seenMessageIds.add({{ message.id }});
 {% endfor %}
 

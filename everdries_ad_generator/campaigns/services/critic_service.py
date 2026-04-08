@@ -204,9 +204,8 @@ class ImageCritic:
                 pass
 
             if not api_key:
-                raise RuntimeError(
-                    "GEMINI_API_KEY not set. Configure it in Settings or .env file."
-                )
+                logger.warning("GEMINI_API_KEY not set — critique disabled")
+                return None
             self._client = genai.Client(api_key=api_key)
         return self._client
 
@@ -250,6 +249,14 @@ class ImageCritic:
 
         # Call Gemini Vision with retry for rate limits
         client = self._get_client()
+        if client is None:
+            logger.info("Skipping critique for %s — no API key configured", image_path.name)
+            return CritiqueResult(
+                image_path=image_path,
+                overall_score=5.0,
+                passed=True,
+                summary="Critique skipped — API key not configured",
+            )
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -272,6 +279,7 @@ class ImageCritic:
                     )
                     time.sleep(wait)
                 else:
+                    logger.error("Critique API error for %s: %s", image_path.name, e)
                     raise
 
         # Parse the response
