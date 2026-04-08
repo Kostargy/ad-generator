@@ -134,9 +134,15 @@
         </label>
         <div class="border border-gray-300 rounded-md p-4 {% if view_only %}bg-gray-50{% endif %}">
           {% if style_assets %}
-          <div class="grid grid-cols-2 gap-3 {% if not view_only %}mb-3{% endif %}">
+          <input type="text"
+                 data-asset-search="style_references"
+                 placeholder="Search style references..."
+                 class="w-full mb-3 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+          <div class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1 {% if not view_only %}mb-3{% endif %}"
+               data-asset-grid="style_references">
             {% for asset in style_assets %}
-            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded {% if not view_only %}hover:bg-gray-50 cursor-pointer{% endif %}">
+            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded {% if not view_only %}hover:bg-gray-50 cursor-pointer{% endif %}"
+                   data-asset-name="{{ asset.name|lower }}">
               <input type="checkbox"
                      name="style_references"
                      value="{{ asset.id }}"
@@ -169,9 +175,15 @@
         </label>
         <div class="border border-gray-300 rounded-md p-4 {% if view_only %}bg-gray-50{% endif %}">
           {% if product_assets %}
-          <div class="grid grid-cols-2 gap-3 {% if not view_only %}mb-3{% endif %}">
+          <input type="text"
+                 data-asset-search="product_references"
+                 placeholder="Search product references..."
+                 class="w-full mb-3 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+          <div class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1 {% if not view_only %}mb-3{% endif %}"
+               data-asset-grid="product_references">
             {% for asset in product_assets %}
-            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded {% if not view_only %}hover:bg-gray-50 cursor-pointer{% endif %}">
+            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded {% if not view_only %}hover:bg-gray-50 cursor-pointer{% endif %}"
+                   data-asset-name="{{ asset.name|lower }}">
               <input type="checkbox"
                      name="product_references"
                      value="{{ asset.id }}"
@@ -252,6 +264,12 @@
            class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
           {% if view_only %}Back{% else %}Cancel{% endif %}
         </a>
+        {% if view_only %}
+        <a href="{% url 'campaigns:generator_create' campaign.id %}?from={{ generator.id }}"
+           class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
+          Duplicate
+        </a>
+        {% endif %}
         {% if not view_only %}
         <button type="submit"
                 class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
@@ -286,7 +304,7 @@
 
         <div class="mb-4">
           <label for="asset_name" class="block text-sm font-medium text-gray-700 mb-1">
-            Name <span class="text-gray-400 font-normal">(optional)</span>
+            Name <span class="text-gray-400 font-normal">(optional, ignored when uploading multiple)</span>
           </label>
           <input type="text"
                  id="asset_name"
@@ -297,16 +315,18 @@
 
         <div class="mb-4">
           <label for="asset_image" class="block text-sm font-medium text-gray-700 mb-1">
-            Image <span class="text-red-500">*</span>
+            Image(s) <span class="text-red-500">*</span>
           </label>
           <input type="file"
                  id="asset_image"
                  name="image"
                  accept="image/*"
+                 multiple
                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
           <div id="asset_preview" class="mt-2 hidden">
             <img id="asset_preview_img" src="" alt="Preview" class="w-full h-64 object-contain rounded border border-gray-200">
           </div>
+          <div id="asset_multi_summary" class="mt-2 hidden text-sm text-gray-600"></div>
         </div>
 
         <div id="asset_error" class="hidden text-red-500 text-sm mb-4"></div>
@@ -447,6 +467,7 @@
     document.getElementById('asset_name').value = '';
     document.getElementById('asset_image').value = '';
     document.getElementById('asset_preview').classList.add('hidden');
+    document.getElementById('asset_multi_summary').classList.add('hidden');
     document.getElementById('asset_error').classList.add('hidden');
 
     const title = type === 'style' ? 'Upload Style Reference' : 'Upload Product Reference';
@@ -464,59 +485,94 @@
 
   // Image preview
   document.getElementById('asset_image').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    const preview = document.getElementById('asset_preview');
+    const previewImg = document.getElementById('asset_preview_img');
+    const multiSummary = document.getElementById('asset_multi_summary');
+
+    preview.classList.add('hidden');
+    multiSummary.classList.add('hidden');
+
+    if (files.length === 1) {
       const reader = new FileReader();
-      reader.onload = function(e) {
-        document.getElementById('asset_preview_img').src = e.target.result;
-        document.getElementById('asset_preview').classList.remove('hidden');
+      reader.onload = function(ev) {
+        previewImg.src = ev.target.result;
+        preview.classList.remove('hidden');
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(files[0]);
+    } else if (files.length > 1) {
+      multiSummary.textContent = files.length + ' files selected';
+      multiSummary.classList.remove('hidden');
     }
   });
 
   async function uploadAsset() {
-    const name = document.getElementById('asset_name').value.trim();
+    const nameInput = document.getElementById('asset_name');
     const imageInput = document.getElementById('asset_image');
     const errorEl = document.getElementById('asset_error');
+    const uploadBtn = document.querySelector('#assetForm button[onclick="uploadAsset()"]');
+    errorEl.classList.add('hidden');
 
-    if (!imageInput.files.length) {
+    const files = Array.from(imageInput.files || []);
+    if (!files.length) {
       errorEl.textContent = 'Image is required.';
       errorEl.classList.remove('hidden');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('asset_type', currentAssetType);
-    formData.append('image', imageInput.files[0]);
+    const singleName = files.length === 1 ? nameInput.value.trim() : '';
+    const type = currentAssetType;
 
-    try {
-      const response = await fetch('{% url "campaigns:asset_upload" %}', {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': '{{ csrf_token }}',
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        errorEl.textContent = data.error || 'Failed to upload asset.';
-        errorEl.classList.remove('hidden');
-        return;
+    const uploadOne = async (file) => {
+      const fd = new FormData();
+      fd.append('name', singleName);
+      fd.append('asset_type', type);
+      fd.append('image', file);
+      let response;
+      try {
+        response = await fetch('{% url "campaigns:asset_upload" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+          body: fd,
+        });
+      } catch (e) {
+        throw new Error(`${file.name}: network error`);
       }
+      let data = {};
+      try { data = await response.json(); } catch (e) { /* noop */ }
+      if (!response.ok) {
+        throw new Error(`${file.name}: ${data.error || 'upload failed'}`);
+      }
+      return data;
+    };
 
-      // Add new checkbox to the appropriate section
-      const containerId = currentAssetType === 'style' ? 'style_references_container' : 'product_references_container';
-      addAssetCheckbox(data, currentAssetType);
-
-      closeAssetModal();
-    } catch (error) {
-      errorEl.textContent = 'Network error. Please try again.';
-      errorEl.classList.remove('hidden');
+    if (uploadBtn) {
+      uploadBtn.disabled = true;
+      uploadBtn.classList.add('opacity-50', 'cursor-not-allowed');
     }
+
+    const results = await Promise.allSettled(files.map(uploadOne));
+    const failures = [];
+    results.forEach((res) => {
+      if (res.status === 'fulfilled') {
+        addAssetCheckbox(res.value, type);
+      } else {
+        failures.push(res.reason.message);
+      }
+    });
+
+    if (uploadBtn) {
+      uploadBtn.disabled = false;
+      uploadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    if (failures.length) {
+      errorEl.textContent = failures.join(' • ');
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    closeAssetModal();
   }
 
   function addAssetCheckbox(asset, type) {
@@ -544,6 +600,7 @@
       // Add the new checkbox
       const label = document.createElement('label');
       label.className = 'flex items-center space-x-3 p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer';
+      label.setAttribute('data-asset-name', (asset.name || '').toLowerCase());
       label.innerHTML = `
         <input type="checkbox"
                name="${fieldName}"
@@ -636,6 +693,20 @@
       closePersonaModal();
       closeAssetModal();
     }
+  });
+
+  // Asset search: filter style/product reference labels by name on key input.
+  document.querySelectorAll('[data-asset-search]').forEach(function(input) {
+    input.addEventListener('input', function() {
+      const target = input.getAttribute('data-asset-search');
+      const grid = document.querySelector(`[data-asset-grid="${target}"]`);
+      if (!grid) return;
+      const q = input.value.trim().toLowerCase();
+      grid.querySelectorAll('[data-asset-name]').forEach(function(label) {
+        const name = label.getAttribute('data-asset-name') || '';
+        label.style.display = name.includes(q) ? '' : 'none';
+      });
+    });
   });
 
   // Auto-grow brief + headlines textareas: always keep 2 empty rows below content.

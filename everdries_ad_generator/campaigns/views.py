@@ -389,12 +389,19 @@ def generator_create(request, campaign_id):
         messages.success(request, f"Generator '{title}' created. Image generation started.")
         return redirect("campaigns:generator_list", campaign_id=campaign_id)
 
+    source = None
+    from_id = request.GET.get("from")
+    if from_id:
+        source = Generator.objects.filter(id=from_id, campaign=campaign).first()
+        if source:
+            source.title = f"{source.title} (copy)"
+
     context = {
         "page_title": "New Generator",
         "is_edit": False,
         "form_action": reverse("campaigns:generator_create", args=[campaign_id]),
         "campaign": campaign,
-        "generator": None,
+        "generator": source,
         "personas": personas,
         "style_assets": style_assets,
         "product_assets": product_assets,

@@ -47,6 +47,7 @@
               <input type="checkbox" id="select-all" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
             </th>
             <th class="text-left py-3 px-4 text-sm font-medium text-gray-500">Generator Name</th>
+            <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Dimensions</th>
             <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Status</th>
             <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Approved</th>
             <th class="text-center py-3 px-4 text-sm font-medium text-gray-500">Ads</th>
@@ -62,6 +63,9 @@
               <input type="checkbox" data-generator-checkbox value="{{ generator.id }}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
             </td>
             <td class="py-4 px-4 text-sm text-gray-800">{{ generator.title }}</td>
+            <td class="py-4 px-4 text-sm text-gray-600 text-center">
+              {% if generator.dimensions %}{{ generator.dimensions }}{% else %}<span class="text-gray-400">-</span>{% endif %}
+            </td>
             <td class="py-4 px-4 text-sm text-center" data-status-cell>
               {% if generator.status == 'completed' %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed</span>
@@ -101,11 +105,15 @@
                  class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors inline-block">
                 View Settings
               </a>
+              <a href="{% url 'campaigns:generator_create' campaign.id %}?from={{ generator.id }}"
+                 class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors inline-block">
+                Duplicate
+              </a>
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="py-8 text-center text-gray-500">
+            <td colspan="7" class="py-8 text-center text-gray-500">
               No generators yet. Click "+ new Generator" to create one.
             </td>
           </tr>
