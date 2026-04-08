@@ -91,9 +91,11 @@
               {% endif %}
             </td>
             <td class="py-4 px-4 text-sm text-gray-600 text-center" data-ads-count-cell>{{ generator.ads_count }}</td>
-            <td class="py-4 px-4 text-right space-x-2">
+            <td class="py-4 px-4 text-right space-x-2"
+                data-actions-cell
+                data-restart-url="{% url 'campaigns:generate_ads' campaign.id generator.id %}">
               {% if generator.status == 'failed' %}
-              <form method="post" action="{% url 'campaigns:generate_ads' campaign.id generator.id %}" class="inline">
+              <form method="post" action="{% url 'campaigns:generate_ads' campaign.id generator.id %}" class="inline" data-restart-form>
                 {% csrf_token %}
                 <button type="submit"
                         class="px-3 py-1 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors">
@@ -212,6 +214,29 @@ function updateGeneratorRow(generator) {
   const adsCountCell = row.querySelector('[data-ads-count-cell]');
   if (adsCountCell) {
     adsCountCell.textContent = generator.ads_count;
+  }
+
+  // Inject / remove Restart button based on current status
+  const actionsCell = row.querySelector('[data-actions-cell]');
+  if (actionsCell) {
+    const existing = actionsCell.querySelector('[data-restart-form]');
+    if (generator.status === 'failed' && !existing) {
+      const url = actionsCell.getAttribute('data-restart-url');
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = url;
+      form.className = 'inline';
+      form.setAttribute('data-restart-form', '');
+      form.innerHTML = `
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+        <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors">
+          Restart
+        </button>
+      `;
+      actionsCell.prepend(form);
+    } else if (generator.status !== 'failed' && existing) {
+      existing.remove();
+    }
   }
 }
 
