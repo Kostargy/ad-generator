@@ -21,7 +21,9 @@
 
   <!-- Form Card -->
   <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-2xl">
-    <form method="post" action="{{ form_action }}">
+    <form method="post"
+          action="{{ form_action }}"
+          onsubmit="(function(f){var b=f.querySelector('button[type=submit]');if(b){b.disabled=true;b.classList.add('opacity-50','cursor-not-allowed');b.textContent='Generating…';}})(this)">
       {% csrf_token %}
 
       <!-- Title -->
