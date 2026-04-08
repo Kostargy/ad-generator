@@ -12,12 +12,16 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_not_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
 
-from .base import ImageProvider, ProviderUnavailableError
+from .base import (
+    ImageGenerationAbortedError,
+    ImageProvider,
+    ProviderUnavailableError,
+)
 
 if TYPE_CHECKING:
     from everdries_ad_generator.campaigns.services.image_gen_adapter import GenerationPrompt
@@ -51,11 +55,19 @@ def _is_unavailable_error(exc: Exception) -> bool:
 
 
 # finish_reasons that are transient model hiccups — safe to retry.
+# IMAGE_OTHER is intentionally NOT here: in practice every image in a
+# batch hits it for the same structural reason, and retrying just
+# burns budget. We abort the whole batch instead.
 _RETRYABLE_FINISH_REASONS = {
-    "IMAGE_OTHER",
     "OTHER",
     "FINISH_REASON_UNSPECIFIED",
     "MAX_TOKENS",
+}
+
+# finish_reasons that should immediately abort the entire generation
+# batch (no retry, no falling through to the next prompt).
+_ABORT_FINISH_REASONS = {
+    "IMAGE_OTHER",
 }
 
 
@@ -160,7 +172,7 @@ class GeminiProvider(ImageProvider):
         @retry(
             stop=stop_after_attempt(MAX_RETRIES),
             wait=wait_exponential(multiplier=RETRY_DELAY, min=RETRY_DELAY, max=60),
-            retry=retry_if_exception_type(Exception),
+            retry=retry_if_not_exception_type(ImageGenerationAbortedError),
             reraise=True,
         )
         def _call() -> Any:
@@ -171,6 +183,13 @@ class GeminiProvider(ImageProvider):
             )
             if not _response_has_image(response):
                 fr = _finish_reason_name(response)
+                if fr in _ABORT_FINISH_REASONS:
+                    # Don't retry, don't continue to next image — abort the
+                    # whole batch. ImageGenerationAbortedError is not caught
+                    # by tenacity below.
+                    raise ImageGenerationAbortedError(
+                        f"Gemini returned finish_reason={fr}; aborting batch"
+                    )
                 if fr in _RETRYABLE_FINISH_REASONS:
                     logger.warning(
                         "Empty image response (finish_reason=%s), retrying", fr
@@ -183,6 +202,8 @@ class GeminiProvider(ImageProvider):
         try:
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(None, _call)
+        except ImageGenerationAbortedError:
+            raise
         except Exception as exc:
             if _is_unavailable_error(exc):
                 raise ProviderUnavailableError(str(exc)) from exc
@@ -246,7 +267,7 @@ class GeminiProvider(ImageProvider):
         @retry(
             stop=stop_after_attempt(MAX_RETRIES),
             wait=wait_exponential(multiplier=RETRY_DELAY, min=RETRY_DELAY, max=60),
-            retry=retry_if_exception_type(Exception),
+            retry=retry_if_not_exception_type(ImageGenerationAbortedError),
             reraise=True,
         )
         def _call() -> Any:
@@ -257,6 +278,10 @@ class GeminiProvider(ImageProvider):
             )
             if not _response_has_image(response):
                 fr = _finish_reason_name(response)
+                if fr in _ABORT_FINISH_REASONS:
+                    raise ImageGenerationAbortedError(
+                        f"Gemini revision returned finish_reason={fr}; aborting"
+                    )
                 if fr in _RETRYABLE_FINISH_REASONS:
                     logger.warning(
                         "Empty revision response (finish_reason=%s), retrying", fr
@@ -267,6 +292,8 @@ class GeminiProvider(ImageProvider):
         try:
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(None, _call)
+        except ImageGenerationAbortedError:
+            raise
         except Exception as exc:
             if _is_unavailable_error(exc):
                 raise ProviderUnavailableError(str(exc)) from exc

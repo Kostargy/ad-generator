@@ -17,6 +17,15 @@ class ProviderUnavailableError(Exception):
     """
 
 
+class ImageGenerationAbortedError(Exception):
+    """Raised when generation should abort the entire batch immediately.
+
+    Used for non-recoverable model responses (e.g. IMAGE_OTHER from Gemini)
+    where retrying or moving on to the next image is wasteful — every image
+    in the batch will hit the same failure.
+    """
+
+
 class ImageProvider(ABC):
     """Interface that all image generation providers must implement."""
 
