@@ -264,9 +264,8 @@ class APISettings(models.Model):
     ]
 
     CRITIC_MODEL_CHOICES = [
-        ("gemini-2.0-flash", "Gemini 2.0 Flash (Fast)"),
-        ("gemini-2.5-flash-preview-05-20", "Gemini 2.5 Flash Preview"),
-        ("gemini-2.5-pro-preview-05-06", "Gemini 2.5 Pro Preview"),
+        ("gemini-2.5-flash", "Gemini 2.5 Flash (Fast)"),
+        ("gemini-2.5-pro", "Gemini 2.5 Pro (Higher quality)"),
     ]
 
     primary_provider = models.CharField(
@@ -286,7 +285,7 @@ class APISettings(models.Model):
     critic_model = models.CharField(
         max_length=100,
         choices=CRITIC_MODEL_CHOICES,
-        default="gemini-2.0-flash",
+        default="gemini-2.5-flash",
         help_text="Model for image quality critique",
     )
     critic_max_retries = models.PositiveSmallIntegerField(

@@ -50,6 +50,36 @@ def _is_unavailable_error(exc: Exception) -> bool:
     return any(signal in msg for signal in _UNAVAILABLE_SIGNALS)
 
 
+# finish_reasons that are transient model hiccups — safe to retry.
+_RETRYABLE_FINISH_REASONS = {
+    "IMAGE_OTHER",
+    "OTHER",
+    "FINISH_REASON_UNSPECIFIED",
+    "MAX_TOKENS",
+}
+
+
+class _EmptyImageResponseError(Exception):
+    """Raised when Gemini returns 200 OK but no image data — used for retry."""
+
+
+def _response_has_image(response: Any) -> bool:
+    candidate = response.candidates[0] if getattr(response, "candidates", None) else None
+    content = getattr(candidate, "content", None) if candidate else None
+    parts = getattr(content, "parts", None) if content else None
+    if not parts:
+        return False
+    return any(getattr(p, "inline_data", None) is not None for p in parts)
+
+
+def _finish_reason_name(response: Any) -> str:
+    candidate = response.candidates[0] if getattr(response, "candidates", None) else None
+    fr = getattr(candidate, "finish_reason", None) if candidate else None
+    if fr is None:
+        return ""
+    return getattr(fr, "name", str(fr))
+
+
 class GeminiProvider(ImageProvider):
     """Gemini native image generation."""
 
@@ -134,11 +164,21 @@ class GeminiProvider(ImageProvider):
             reraise=True,
         )
         def _call() -> Any:
-            return client.models.generate_content(
+            response = client.models.generate_content(
                 model=self.model_name,
                 contents=contents,
                 config=config,
             )
+            if not _response_has_image(response):
+                fr = _finish_reason_name(response)
+                if fr in _RETRYABLE_FINISH_REASONS:
+                    logger.warning(
+                        "Empty image response (finish_reason=%s), retrying", fr
+                    )
+                    raise _EmptyImageResponseError(f"finish_reason={fr}")
+                # Non-retryable (e.g. SAFETY) — return as-is so parse_response
+                # surfaces a clean error to the caller.
+            return response
 
         try:
             loop = asyncio.get_event_loop()
@@ -210,11 +250,19 @@ class GeminiProvider(ImageProvider):
             reraise=True,
         )
         def _call() -> Any:
-            return client.models.generate_content(
+            response = client.models.generate_content(
                 model=self.model_name,
                 contents=contents,
                 config=gen_config,
             )
+            if not _response_has_image(response):
+                fr = _finish_reason_name(response)
+                if fr in _RETRYABLE_FINISH_REASONS:
+                    logger.warning(
+                        "Empty revision response (finish_reason=%s), retrying", fr
+                    )
+                    raise _EmptyImageResponseError(f"finish_reason={fr}")
+            return response
 
         try:
             loop = asyncio.get_event_loop()
