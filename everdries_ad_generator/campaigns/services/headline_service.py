@@ -101,7 +101,7 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
         for attempt in range(self.max_retries + 1):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-2.5-flash",
                     contents=[prompt],
                     config=types.GenerateContentConfig(
                         temperature=0.9,

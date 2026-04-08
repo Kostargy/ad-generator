@@ -179,7 +179,7 @@ class ImageCritic:
     Issues found generate specific revision instructions.
     """
 
-    def __init__(self, model_name: str = "gemini-2.0-flash") -> None:
+    def __init__(self, model_name: str = "gemini-2.5-flash") -> None:
         self.model_name = model_name
         self.max_retries = 3
         self.retry_delay_seconds = 2.0
@@ -198,7 +198,7 @@ class ImageCritic:
                 if not api_key:
                     api_key = api_settings.gemini_api_key
                 # Use critic_model and max_retries from settings
-                self.model_name = api_settings.critic_model or "gemini-2.0-flash"
+                self.model_name = api_settings.critic_model or "gemini-2.5-flash"
                 self.max_retries = api_settings.critic_max_retries
             except Exception:
                 pass

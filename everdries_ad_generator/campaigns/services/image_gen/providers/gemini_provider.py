@@ -159,8 +159,10 @@ class GeminiProvider(ImageProvider):
         """Extract the image from the API response and save to disk."""
         image_path = output_dir / f"{run_prefix}gen_{index:04d}.png"
 
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
+        candidate = response.candidates[0] if response.candidates else None
+        content = getattr(candidate, "content", None) if candidate else None
+        if content and getattr(content, "parts", None):
+            for part in content.parts:
                 if part.inline_data is not None:
                     image = Image.open(BytesIO(part.inline_data.data))
                     image.save(str(image_path), "PNG")
@@ -172,10 +174,14 @@ class GeminiProvider(ImageProvider):
                     )
                     return image_path
 
+        finish_reason = getattr(candidate, "finish_reason", None) if candidate else None
+        prompt_feedback = getattr(response, "prompt_feedback", None)
         raise RuntimeError(
             f"No image data in API response for prompt {index} "
             f"({prompt.image_prompt_name}). "
-            f"Response text: {getattr(response, 'text', 'N/A')}"
+            f"finish_reason={finish_reason!r}, "
+            f"prompt_feedback={prompt_feedback!r}, "
+            f"text={getattr(response, 'text', 'N/A')!r}"
         )
 
     async def call_revision_api(
@@ -219,17 +225,23 @@ class GeminiProvider(ImageProvider):
             raise
 
     def parse_revision_response(self, response: Any, output_path: Path) -> Path:
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
+        candidate = response.candidates[0] if response.candidates else None
+        content = getattr(candidate, "content", None) if candidate else None
+        if content and getattr(content, "parts", None):
+            for part in content.parts:
                 if part.inline_data is not None:
                     result_img = Image.open(BytesIO(part.inline_data.data))
                     result_img.save(str(output_path), "PNG")
                     logger.info("Saved revision to %s", output_path)
                     return output_path
 
+        finish_reason = getattr(candidate, "finish_reason", None) if candidate else None
+        prompt_feedback = getattr(response, "prompt_feedback", None)
         raise RuntimeError(
             f"No image data in revision response. "
-            f"Response text: {getattr(response, 'text', 'N/A')}"
+            f"finish_reason={finish_reason!r}, "
+            f"prompt_feedback={prompt_feedback!r}, "
+            f"text={getattr(response, 'text', 'N/A')!r}"
         )
 
     def log_payload_size(self, contents: Any, index: int, ref_count: int) -> None:
