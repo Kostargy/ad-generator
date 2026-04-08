@@ -18,11 +18,7 @@ from zoneinfo import ZoneInfo
 
 from PIL import Image
 
-from .providers.base import (
-    ImageGenerationAbortedError,
-    ImageProvider,
-    ProviderUnavailableError,
-)
+from .providers.base import ImageProvider, ProviderUnavailableError
 from .providers.gemini_provider import GeminiProvider
 from .providers.openai_provider import OpenAIProvider
 
@@ -224,14 +220,6 @@ class ImageGenerator:
             else:
                 try:
                     result = await self._generate_single(i, prompt)
-                except ImageGenerationAbortedError as e:
-                    logger.error(
-                        "Image %d/%d aborted batch: %s",
-                        i + 1,
-                        len(prompts),
-                        e,
-                    )
-                    raise
                 except Exception as e:
                     failed += 1
                     logger.error(
