@@ -94,11 +94,11 @@ if env("BUCKETEER_BUCKET_NAME", default=""):
     AWS_SECRET_ACCESS_KEY = env("BUCKETEER_AWS_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = env("BUCKETEER_BUCKET_NAME")
     AWS_S3_REGION_NAME = env("BUCKETEER_AWS_REGION", default="us-east-1")
-    AWS_QUERYSTRING_AUTH = False
+    # Bucketeer buckets are private. Use presigned URLs (querystring auth) so
+    # media files load from S3 without needing public-read ACLs.
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = 60 * 60 * 24  # 24h signed URLs
     AWS_S3_FILE_OVERWRITE = False
-    AWS_S3_OBJECT_PARAMETERS = {
-        "CacheControl": "max-age=604800, public",
-    }
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3.S3Storage",
         "OPTIONS": {
@@ -106,9 +106,6 @@ if env("BUCKETEER_BUCKET_NAME", default=""):
             "file_overwrite": False,
         },
     }
-    MEDIA_URL = (
-        f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/media/"
-    )
 
 # EMAIL
 # ------------------------------------------------------------------------------
