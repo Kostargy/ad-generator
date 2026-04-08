@@ -190,7 +190,7 @@ def campaign_create(request):
 
         # Basic validation
         if not name:
-            messages.error(request, "Campaign name is required.")
+            messages.error(request, "Product name is required.")
             return redirect("campaigns:campaign_create")
 
         # Create the campaign
@@ -200,11 +200,11 @@ def campaign_create(request):
             created_by=request.user,
         )
 
-        messages.success(request, f"Campaign '{name}' created successfully.")
-        return redirect("campaigns:generator", campaign_id=campaign.id)
+        messages.success(request, f"Product '{name}' created successfully.")
+        return redirect("campaigns:generator_list", campaign_id=campaign.id)
 
     context = {
-        "page_title": "New Campaign",
+        "page_title": "New Product",
         "is_edit": False,
         "form_action": reverse("campaigns:campaign_create"),
         "products": Campaign.PRODUCT_CHOICES,
@@ -224,7 +224,7 @@ def campaign_edit(request, campaign_id):
 
         # Basic validation
         if not name:
-            messages.error(request, "Campaign name is required.")
+            messages.error(request, "Product name is required.")
             return redirect("campaigns:campaign_edit", campaign_id=campaign_id)
 
         # Update the campaign
@@ -232,11 +232,11 @@ def campaign_edit(request, campaign_id):
         campaign.description = description
         campaign.save()
 
-        messages.success(request, f"Campaign '{name}' updated successfully.")
+        messages.success(request, f"Product '{name}' updated successfully.")
         return redirect("campaigns:dashboard")
 
     context = {
-        "page_title": "Edit Campaign",
+        "page_title": "Edit Product",
         "is_edit": True,
         "form_action": reverse("campaigns:campaign_edit", args=[campaign_id]),
         "products": Campaign.PRODUCT_CHOICES,
