@@ -131,34 +131,40 @@ class ImageGenAdapter:
         if not cfg.headlines:
             return prompts
 
-        # Use [None] if no style refs to still generate one per headline
+        # Use [None] sentinels so we still emit at least one prompt per headline
+        # when style or product references are absent.
         style_refs = cfg.style_reference_paths or [None]
+        product_refs = cfg.product_reference_paths or [None]
 
         for headline in cfg.headlines:
             for style_idx, style_path in enumerate(style_refs):
-                prompt_text = self._format_prompt(
-                    headline=headline,
-                    has_style_ref=style_path is not None,
-                )
-
-                # Label with variant number if multiple styles
-                if len(style_refs) > 1 and style_path:
-                    name = f"{headline[:50]} (v{style_idx + 1})"
-                else:
-                    name = headline[:50]
-
-                prompts.append(
-                    GenerationPrompt(
-                        prompt_text=prompt_text,
-                        reference_images=list(cfg.product_reference_paths),
-                        logo_images=[],
-                        style_reference=style_path,
-                        product_name=cfg.product_name,
-                        image_prompt_name=name,
-                        aspect_ratio=cfg.aspect_ratio,
-                        style_variant=style_idx,
+                for prod_idx, prod_path in enumerate(product_refs):
+                    prompt_text = self._format_prompt(
+                        headline=headline,
+                        has_style_ref=style_path is not None,
                     )
-                )
+
+                    # Build a name that distinguishes each cell in the fan-out
+                    # so Ad rows are identifiable in the UI.
+                    name_parts = [headline[:40]]
+                    if len(style_refs) > 1 and style_path:
+                        name_parts.append(f"v{style_idx + 1}")
+                    if len(product_refs) > 1 and prod_path:
+                        name_parts.append(f"p{prod_idx + 1}")
+                    name = " ".join(name_parts)
+
+                    prompts.append(
+                        GenerationPrompt(
+                            prompt_text=prompt_text,
+                            reference_images=[prod_path] if prod_path else [],
+                            logo_images=[],
+                            style_reference=style_path,
+                            product_name=cfg.product_name,
+                            image_prompt_name=name[:255],
+                            aspect_ratio=cfg.aspect_ratio,
+                            style_variant=style_idx,
+                        )
+                    )
 
         return prompts
 
@@ -225,4 +231,8 @@ class ImageGenAdapter:
 
     def get_estimated_count(self) -> int:
         """Return estimated number of images to generate."""
-        return len(self.config.headlines) * max(1, len(self.config.style_reference_paths))
+        return (
+            len(self.config.headlines)
+            * max(1, len(self.config.style_reference_paths))
+            * max(1, len(self.config.product_reference_paths))
+        )
