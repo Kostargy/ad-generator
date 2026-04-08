@@ -49,6 +49,7 @@
         <textarea id="brief"
                   name="brief"
                   rows="4"
+                  style="min-height: 8rem; overflow: hidden; resize: none;"
                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent {% if view_only %}bg-gray-50{% endif %}"
                   placeholder="Describe the creative direction, messaging angle, or key points for this generator..."
                   {% if view_only %}disabled{% endif %}>{{ generator.brief|default:'' }}</textarea>
@@ -634,5 +635,18 @@
       closeAssetModal();
     }
   });
+
+  // Auto-grow the brief textarea: always keep 2 empty rows below the content.
+  (function() {
+    const ta = document.getElementById('brief');
+    if (!ta) return;
+    const grow = () => {
+      ta.style.height = 'auto';
+      const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 24;
+      ta.style.height = (ta.scrollHeight + lineHeight * 2) + 'px';
+    };
+    ta.addEventListener('input', grow);
+    grow();
+  })();
 </script>
 {% endblock extra_js %}
