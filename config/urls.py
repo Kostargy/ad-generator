@@ -1,10 +1,11 @@
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include
 from django.urls import path
+from django.urls import re_path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
+from django.views.static import serve
 
 urlpatterns = [
     path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
@@ -20,8 +21,12 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     # Campaigns app (main dashboard)
     path("app/", include("everdries_ad_generator.campaigns.urls", namespace="campaigns")),
-    # Media files
-    *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
+    # Media files (served by Django in both dev and prod — note: ephemeral on Heroku)
+    re_path(
+        r"^media/(?P<path>.*)$",
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
 ]
 
 
