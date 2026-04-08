@@ -1,0 +1,37 @@
+{
+  "name": "everdries-ad-generator",
+  "description": "AI ad image generator (Django + Celery + Gemini/OpenAI)",
+  "stack": "heroku-24",
+  "buildpacks": [
+    {"url": "https://github.com/heroku/heroku-buildpack-uv"},
+    {"url": "heroku/python"}
+  ],
+  "addons": [
+    {"plan": "heroku-postgresql:essential-0"},
+    {"plan": "heroku-redis:mini"}
+  ],
+  "env": {
+    "DJANGO_SETTINGS_MODULE": {
+      "value": "config.settings.production"
+    },
+    "DJANGO_SECRET_KEY": {
+      "generator": "secret"
+    },
+    "DJANGO_ALLOWED_HOSTS": {
+      "value": ".herokuapp.com"
+    },
+    "DJANGO_SECURE_SSL_REDIRECT": {
+      "value": "True"
+    },
+    "WEB_CONCURRENCY": {
+      "value": "2"
+    }
+  },
+  "formation": {
+    "web": {"quantity": 1, "size": "basic"},
+    "worker": {"quantity": 1, "size": "basic"}
+  },
+  "scripts": {
+    "postdeploy": "python manage.py migrate --noinput"
+  }
+}
