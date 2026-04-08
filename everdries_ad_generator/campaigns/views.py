@@ -46,6 +46,26 @@ def generator_list(request, campaign_id):
 
 
 @login_required
+def generator_statuses(request, campaign_id):
+    """Return current status of all generators for polling."""
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+    generators = campaign.generators.all()
+
+    data = {
+        "generators": [
+            {
+                "id": g.id,
+                "status": g.status,
+                "ads_count": g.ads_count,
+                "approved_count": g.approved_count,
+            }
+            for g in generators
+        ]
+    }
+    return JsonResponse(data)
+
+
+@login_required
 def ads_list(request, campaign_id):
     """Ads list view - shows all ads for a campaign."""
     campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
@@ -362,6 +382,41 @@ def generate_ads(request, campaign_id, generator_id):
 
     messages.success(request, f"Image generation started for '{generator.title}'. Check back shortly.")
     return redirect("campaigns:generator_list", campaign_id=campaign_id)
+
+
+@login_required
+@require_POST
+def generate_headlines(request, campaign_id):
+    """Generate headlines using AI based on campaign and form data."""
+    from .services.headline_service import HeadlineGenerator
+
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    number_of_ads = data.get("number_of_ads", 5)
+    brief = data.get("brief", "")
+    persona_id = data.get("persona_id")
+
+    persona_description = ""
+    if persona_id:
+        persona = CustomerPersona.objects.filter(id=persona_id, created_by=request.user).first()
+        if persona:
+            persona_description = persona.description
+
+    generator = HeadlineGenerator()
+    headlines = generator.generate(
+        product_name=campaign.name,
+        product_context=campaign.description,
+        persona_description=persona_description,
+        brief=brief,
+        count=number_of_ads,
+    )
+
+    return JsonResponse({"headlines": headlines})
 
 
 @login_required

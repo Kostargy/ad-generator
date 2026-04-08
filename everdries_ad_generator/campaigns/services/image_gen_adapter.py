@@ -124,6 +124,15 @@ class ImageGenAdapter:
 
         return prompts
 
+    def _get_master_prompt(self) -> str:
+        """Get master prompt from APISettings."""
+        try:
+            from everdries_ad_generator.campaigns.models import APISettings
+            api_settings = APISettings.get_settings()
+            return api_settings.master_prompt or APISettings.DEFAULT_MASTER_PROMPT
+        except Exception:
+            return ""
+
     def _format_prompt(self, headline: str, has_style_ref: bool = False) -> str:
         """Build the prompt text for image generation."""
         cfg = self.config
@@ -166,11 +175,11 @@ class ImageGenAdapter:
         # Brand tone
         if cfg.persona_description:
             parts.append(f"\nBRAND TONE: {cfg.persona_description}")
-        else:
-            parts.append(
-                "\nBRAND: Warm, relatable, empowering tone. "
-                "No Trustpilot. No 'premium' messaging. No logo."
-            )
+
+        # Master prompt (global brand guidelines)
+        master_prompt = self._get_master_prompt()
+        if master_prompt:
+            parts.append(f"\nGLOBAL GUIDELINES:\n{master_prompt}")
 
         parts.append("\nGenerate a high-quality advertisement image.")
 

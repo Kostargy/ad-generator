@@ -7,7 +7,7 @@
   <!-- Breadcrumb with Campaign Title -->
   <div class="mb-4">
     <nav class="flex items-center text-sm text-gray-500">
-      <a href="{% url 'campaigns:dashboard' %}" class="hover:text-gray-700">Campaigns</a>
+      <a href="{% url 'campaigns:dashboard' %}" class="hover:text-gray-700">Products</a>
       <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
       </svg>
@@ -52,9 +52,10 @@
         <tbody>
           {% for generator in generators %}
           <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+              data-generator-id="{{ generator.id }}"
               onclick="window.location='{% url 'campaigns:ads_list' campaign.id %}?generator={{ generator.id }}'">
             <td class="py-4 px-4 text-sm text-gray-800">{{ generator.title }}</td>
-            <td class="py-4 px-4 text-sm text-center">
+            <td class="py-4 px-4 text-sm text-center" data-status-cell>
               {% if generator.status == 'completed' %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed</span>
               {% elif generator.status == 'processing' %}
@@ -71,14 +72,14 @@
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Pending</span>
               {% endif %}
             </td>
-            <td class="py-4 px-4 text-sm text-center">
+            <td class="py-4 px-4 text-sm text-center" data-approved-cell>
               {% if generator.approved_count > 0 %}
                 <span class="text-green-600">{{ generator.approved_count }}/{{ generator.ads_count }}</span>
               {% else %}
                 <span class="text-gray-400">-</span>
               {% endif %}
             </td>
-            <td class="py-4 px-4 text-sm text-gray-600 text-center">{{ generator.ads_count }}</td>
+            <td class="py-4 px-4 text-sm text-gray-600 text-center" data-ads-count-cell>{{ generator.ads_count }}</td>
             <td class="py-4 px-4 text-right space-x-2">
               {% if generator.status == 'failed' %}
               <form method="post" action="{% url 'campaigns:generate_ads' campaign.id generator.id %}" class="inline">
@@ -107,4 +108,64 @@
     </div>
   </div>
 </div>
+
+<script>
+// Poll generator statuses every 60 seconds
+setInterval(pollGeneratorStatuses, 60000);
+
+function pollGeneratorStatuses() {
+  fetch('{% url "campaigns:generator_statuses" campaign.id %}')
+    .then(r => r.json())
+    .then(data => {
+      data.generators.forEach(g => updateGeneratorRow(g));
+    })
+    .catch(err => console.error('Failed to poll generator statuses:', err));
+}
+
+function updateGeneratorRow(generator) {
+  const row = document.querySelector(`tr[data-generator-id="${generator.id}"]`);
+  if (!row) return;
+
+  // Update status badge
+  const statusCell = row.querySelector('[data-status-cell]');
+  if (statusCell) {
+    statusCell.innerHTML = getStatusBadgeHTML(generator.status);
+  }
+
+  // Update approved count
+  const approvedCell = row.querySelector('[data-approved-cell]');
+  if (approvedCell) {
+    if (generator.approved_count > 0) {
+      approvedCell.innerHTML = `<span class="text-green-600">${generator.approved_count}/${generator.ads_count}</span>`;
+    } else {
+      approvedCell.innerHTML = '<span class="text-gray-400">-</span>';
+    }
+  }
+
+  // Update ads count
+  const adsCountCell = row.querySelector('[data-ads-count-cell]');
+  if (adsCountCell) {
+    adsCountCell.textContent = generator.ads_count;
+  }
+}
+
+function getStatusBadgeHTML(status) {
+  switch (status) {
+    case 'completed':
+      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed</span>';
+    case 'processing':
+      return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Processing
+      </span>`;
+    case 'failed':
+      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>';
+    default:
+      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Pending</span>';
+  }
+}
+</script>
 {% endblock content %}
