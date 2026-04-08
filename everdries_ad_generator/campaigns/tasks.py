@@ -2,13 +2,37 @@
 Celery tasks for async image generation and revision.
 """
 
+import json
 import logging
+import re
 import traceback
 
 from celery import shared_task
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
+
+
+def _friendly_error_message(exc: Exception) -> str:
+    """Extract a user-facing message from a provider exception.
+
+    OpenAI/Gemini SDK exceptions stringify as `Error code: 400 - {...json...}`.
+    Pull the inner `error.message` if we can; otherwise fall back to str(exc).
+    """
+    raw = str(exc)
+    # Try to find a JSON-ish payload after the dash
+    match = re.search(r"\{.*\}", raw)
+    if match:
+        payload = match.group(0)
+        try:
+            data = json.loads(payload.replace("'", '"'))
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            err = data.get("error") if isinstance(data.get("error"), dict) else data
+            if isinstance(err, dict) and err.get("message"):
+                return str(err["message"])
+    return raw
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
@@ -134,7 +158,7 @@ def revise_ad_task(self, ad_id: int, message_id: int) -> dict:
         AdMessage.objects.create(
             ad=ad,
             role=AdMessage.ROLE_ASSISTANT,
-            content=f"Sorry, I couldn't complete the revision: {str(exc)}",
+            content=f"Sorry, I couldn't complete the revision: {_friendly_error_message(exc)}",
         )
 
         # Don't retry on revision errors - user can send another message
