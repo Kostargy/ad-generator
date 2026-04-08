@@ -577,6 +577,9 @@ def settings_view(request):
         gemini_key = request.POST.get("gemini_api_key", "").strip()
         openai_key = request.POST.get("openai_api_key", "").strip()
         gemini_model = request.POST.get("gemini_model", "").strip()
+        critic_model = request.POST.get("critic_model", "").strip()
+        critic_max_retries = request.POST.get("critic_max_retries", "").strip()
+        master_prompt = request.POST.get("master_prompt", "").strip()
 
         if primary_provider:
             api_settings.primary_provider = primary_provider
@@ -584,9 +587,17 @@ def settings_view(request):
         api_settings.openai_api_key = openai_key
         if gemini_model:
             api_settings.gemini_model = gemini_model
+        if critic_model:
+            api_settings.critic_model = critic_model
+        if critic_max_retries:
+            try:
+                api_settings.critic_max_retries = max(0, min(10, int(critic_max_retries)))
+            except ValueError:
+                pass
+        api_settings.master_prompt = master_prompt
         api_settings.save()
 
-        messages.success(request, "API settings updated successfully.")
+        messages.success(request, "Settings updated successfully.")
         return redirect("campaigns:settings")
 
     context = {
@@ -594,5 +605,7 @@ def settings_view(request):
         "api_settings": api_settings,
         "provider_choices": APISettings.PROVIDER_CHOICES,
         "gemini_model_choices": APISettings.GEMINI_MODEL_CHOICES,
+        "critic_model_choices": APISettings.CRITIC_MODEL_CHOICES,
+        "default_master_prompt": APISettings.DEFAULT_MASTER_PROMPT,
     }
     return render(request, "campaigns/settings.html", context)

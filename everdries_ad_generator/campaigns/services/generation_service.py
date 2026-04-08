@@ -13,14 +13,15 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.core.files import File
 
-# Add image-gen to path
+# Add image-gen to path for generator (still needed for image generation)
 IMAGE_GEN_PATH = Path(__file__).resolve().parents[4] / "image-gen"
 if str(IMAGE_GEN_PATH) not in sys.path:
     sys.path.insert(0, str(IMAGE_GEN_PATH))
 
 from image_gen.config import load_config
-from image_gen.generator import GeneratedImage, ImageGenerator
+from image_gen.generator import GeneratedImage, ImageGenerator, RevisionContext
 
+from .critic_service import CritiqueResult, ImageCritic
 from .image_gen_adapter import ImageGenAdapter
 
 if TYPE_CHECKING:
@@ -38,6 +39,8 @@ class GenerationService:
         self.config = load_config(IMAGE_GEN_PATH / "config.yaml")
         self.output_dir = Path(settings.MEDIA_ROOT) / "generated" / str(generator.id)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.critic = ImageCritic()
+        self.image_generator: ImageGenerator | None = None
 
     def _load_api_settings(self):
         """Load API keys and model settings from database."""
@@ -105,13 +108,17 @@ class GenerationService:
             # Step 3: Generate images (async part only)
             generated = asyncio.run(self._generate_images(prompts))
 
-            # Step 4: Create Ad records (sync, after async)
-            for img in generated:
-                ad = self._create_ad(img)
+            # Step 4: Critique & auto-revise images
+            logger.info("Critiquing %d images...", len(generated))
+            generated, critiques = self._critique_and_revise(generated)
+
+            # Step 5: Create Ad records (sync, after async)
+            for img, critique in zip(generated, critiques):
+                ad = self._create_ad(img, critique)
                 if ad:
                     ads_created.append(ad)
 
-            # Step 5: Mark completed or failed based on results
+            # Step 6: Mark completed or failed based on results
             if ads_created:
                 self.generator.status = Generator.STATUS_COMPLETED
                 logger.info(
@@ -137,16 +144,166 @@ class GenerationService:
 
     async def _generate_images(self, prompts: list) -> list[GeneratedImage]:
         """Generate images asynchronously (no Django ORM calls here)."""
-        generator = ImageGenerator(
+        self.image_generator = ImageGenerator(
             config=self.config.gemini,
             output_dir=self.output_dir,
             checkpoint_dir=self.output_dir / "checkpoints",
             app_config=self.config,
         )
-        return await generator.generate_batch(prompts=prompts, dry_run=False)
+        return await self.image_generator.generate_batch(prompts=prompts, dry_run=False)
 
-    def _create_ad(self, gen_image: GeneratedImage) -> "Ad | None":
-        """Create an Ad record from a generated image."""
+    def _critique_and_revise(
+        self, images: list[GeneratedImage], max_revisions: int = 2
+    ) -> tuple[list[GeneratedImage], list[CritiqueResult]]:
+        """Critique images and auto-revise if needed.
+
+        For each image:
+        1. Critique against 7 quality checks
+        2. If issues found, revise from original and re-critique
+        3. Keep the best-scoring version
+        """
+        final_images: list[GeneratedImage] = []
+        critiques: list[CritiqueResult] = []
+
+        product_name = self.generator.campaign.name
+
+        for img in images:
+            try:
+                # Initial critique
+                critique = self.critic.critique(
+                    image_path=Path(img.image_path),
+                    product_name=product_name,
+                    prompt_name=img.prompt.image_prompt_name,
+                    expected_price="5 for $69.95",
+                    aspect_ratio=img.prompt.aspect_ratio,
+                )
+
+                logger.info(
+                    "Critique %s: score=%.1f, passed=%s, issues=%d",
+                    Path(img.image_path).name,
+                    critique.overall_score,
+                    critique.passed,
+                    len(critique.issues),
+                )
+
+                best_image = img
+                best_critique = critique
+                revision_count = 0
+
+                # Auto-revise loop if needed
+                if critique.needs_revision and self.image_generator:
+                    for rev_num in range(max_revisions):
+                        if not critique.needs_revision:
+                            break
+
+                        logger.info(
+                            "Revising %s (attempt %d): %s",
+                            Path(img.image_path).name,
+                            rev_num + 1,
+                            critique.revision_instructions[:100],
+                        )
+
+                        # Build revision context
+                        context = RevisionContext(
+                            reference_images=[
+                                Path(p) for p in img.prompt.reference_images if p
+                            ],
+                            logo_images=[],
+                            style_reference=(
+                                Path(img.prompt.style_reference)
+                                if img.prompt.style_reference
+                                else None
+                            ),
+                            prompt_text=img.prompt.prompt_text,
+                            aspect_ratio=img.prompt.aspect_ratio,
+                            product_name=img.prompt.product_name,
+                        )
+
+                        # Revise from ORIGINAL image
+                        try:
+                            revised_path = asyncio.run(
+                                self.image_generator.revise_image(
+                                    image_path=Path(img.image_path),
+                                    instructions=critique.revision_instructions,
+                                    context=context,
+                                )
+                            )
+
+                            revision_count += 1
+
+                            # Re-critique the revision
+                            rev_critique = self.critic.critique(
+                                image_path=revised_path,
+                                product_name=product_name,
+                                prompt_name=img.prompt.image_prompt_name,
+                                expected_price="5 for $69.95",
+                                aspect_ratio=img.prompt.aspect_ratio,
+                            )
+
+                            logger.info(
+                                "Revision %d critique: score=%.1f, passed=%s",
+                                rev_num + 1,
+                                rev_critique.overall_score,
+                                rev_critique.passed,
+                            )
+
+                            # Keep if better
+                            if rev_critique.overall_score > best_critique.overall_score:
+                                # Create a new GeneratedImage with revised path
+                                best_image = GeneratedImage(
+                                    image_path=str(revised_path),
+                                    prompt=img.prompt,
+                                    generation_id=img.generation_id,
+                                    timestamp=img.timestamp,
+                                )
+                                best_critique = rev_critique
+
+                            # Stop if passed or no improvement
+                            if (
+                                rev_critique.passed
+                                or rev_critique.overall_score <= critique.overall_score
+                            ):
+                                break
+
+                            critique = rev_critique
+
+                        except Exception as e:
+                            logger.warning("Revision failed: %s", e)
+                            break
+
+                # Store revision count on critique for _create_ad
+                best_critique._revision_count = revision_count
+
+                final_images.append(best_image)
+                critiques.append(best_critique)
+
+            except Exception as e:
+                logger.warning("Critique failed for %s: %s", img.image_path, e)
+                # Create a default critique result
+                default_critique = CritiqueResult(
+                    image_path=Path(img.image_path),
+                    overall_score=5.0,
+                    passed=True,
+                    summary=f"Critique skipped: {e}",
+                )
+                default_critique._revision_count = 0
+                final_images.append(img)
+                critiques.append(default_critique)
+
+        passed = sum(1 for c in critiques if c.passed)
+        logger.info(
+            "Critique complete: %d/%d passed, %d revised",
+            passed,
+            len(critiques),
+            sum(1 for c in critiques if getattr(c, "_revision_count", 0) > 0),
+        )
+
+        return final_images, critiques
+
+    def _create_ad(
+        self, gen_image: GeneratedImage, critique: CritiqueResult | None = None
+    ) -> "Ad | None":
+        """Create an Ad record from a generated image with critique data."""
         from everdries_ad_generator.campaigns.models import Ad
 
         try:
@@ -178,6 +335,16 @@ class GenerationService:
                 "generation_id": gen_image.generation_id,
                 "timestamp": gen_image.timestamp,
             }
+
+            # Store critique data if available
+            if critique:
+                revision_count = getattr(critique, "_revision_count", 0)
+                ad.critique_score = critique.overall_score
+                ad.critique_passed = critique.passed
+                ad.critique_summary = critique.summary
+                ad.critique_data = critique.to_dict()
+                ad.was_auto_revised = revision_count > 0
+                ad.revision_count = revision_count
 
             ad.save()
             return ad

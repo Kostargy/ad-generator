@@ -7,118 +7,252 @@
   <!-- Page Title -->
   <h1 class="text-2xl font-semibold text-gray-800 mb-6">Settings</h1>
 
-  <!-- Settings Card -->
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-2xl">
-    <h2 class="text-lg font-medium text-gray-800 mb-6">API Configuration</h2>
+  <!-- Tab Navigation -->
+  <div class="flex space-x-1 mb-6 border-b border-gray-200">
+    <button type="button"
+            onclick="switchTab('api')"
+            id="tab-api"
+            class="px-6 py-3 text-sm font-medium border-b-2 border-green-500 text-green-600 -mb-px">
+      API Keys
+    </button>
+    <button type="button"
+            onclick="switchTab('models')"
+            id="tab-models"
+            class="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px">
+      Models
+    </button>
+    <button type="button"
+            onclick="switchTab('prompt')"
+            id="tab-prompt"
+            class="px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px">
+      Master Prompt
+    </button>
+  </div>
 
-    <form method="post" class="space-y-6">
-      {% csrf_token %}
+  <form method="post">
+    {% csrf_token %}
 
-      <!-- Primary Provider -->
-      <div>
-        <label for="primary_provider" class="block text-sm font-medium text-gray-700 mb-2">
-          Provider Priority
-        </label>
-        <select name="primary_provider"
-                id="primary_provider"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white">
-          {% for value, label in provider_choices %}
-            <option value="{{ value }}" {% if api_settings.primary_provider == value %}selected{% endif %}>
-              {{ label }}
-            </option>
-          {% endfor %}
-        </select>
-        <p class="mt-1 text-sm text-gray-500">
-          Select which provider to try first. Fallback is used if primary fails.
-        </p>
-      </div>
+    <!-- API Keys Tab -->
+    <div id="content-api" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-2xl">
+      <h2 class="text-lg font-medium text-gray-800 mb-6">API Configuration</h2>
 
-      <hr class="border-gray-200">
+      <div class="space-y-6">
+        <!-- Primary Provider -->
+        <div>
+          <label for="primary_provider" class="block text-sm font-medium text-gray-700 mb-2">
+            Provider Priority
+          </label>
+          <select name="primary_provider"
+                  id="primary_provider"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+            {% for value, label in provider_choices %}
+              <option value="{{ value }}" {% if api_settings.primary_provider == value %}selected{% endif %}>
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
+          <p class="mt-1 text-sm text-gray-500">
+            Select which provider to try first. Fallback is used if primary fails.
+          </p>
+        </div>
 
-      <!-- Gemini API Key -->
-      <div>
-        <label for="gemini_api_key" class="block text-sm font-medium text-gray-700 mb-2">
-          Gemini API Key
-        </label>
-        <input type="password"
-               name="gemini_api_key"
-               id="gemini_api_key"
-               value="{{ api_settings.gemini_api_key }}"
-               placeholder="Enter your Gemini API key"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-        <p class="mt-1 text-sm text-gray-500">
-          Get your API key from <a href="https://aistudio.google.com/" target="_blank" class="text-blue-600 hover:underline">Google AI Studio</a>
-        </p>
-      </div>
+        <hr class="border-gray-200">
 
-      <!-- Gemini Model -->
-      <div>
-        <label for="gemini_model" class="block text-sm font-medium text-gray-700 mb-2">
-          Gemini Model
-        </label>
-        <select name="gemini_model"
-                id="gemini_model"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white">
-          {% for value, label in gemini_model_choices %}
-            <option value="{{ value }}" {% if api_settings.gemini_model == value %}selected{% endif %}>
-              {{ label }}
-            </option>
-          {% endfor %}
-        </select>
-        <p class="mt-1 text-sm text-gray-500">
-          Select the Gemini model for image generation. Some models may require special access.
-        </p>
-      </div>
+        <!-- Gemini API Key -->
+        <div>
+          <label for="gemini_api_key" class="block text-sm font-medium text-gray-700 mb-2">
+            Gemini API Key
+          </label>
+          <input type="password"
+                 name="gemini_api_key"
+                 id="gemini_api_key"
+                 value="{{ api_settings.gemini_api_key }}"
+                 placeholder="Enter your Gemini API key"
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
+          <p class="mt-1 text-sm text-gray-500">
+            Get your API key from <a href="https://aistudio.google.com/" target="_blank" class="text-green-600 hover:underline">Google AI Studio</a>
+          </p>
+        </div>
 
-      <!-- OpenAI API Key -->
-      <div>
-        <label for="openai_api_key" class="block text-sm font-medium text-gray-700 mb-2">
-          OpenAI API Key
-        </label>
-        <input type="password"
-               name="openai_api_key"
-               id="openai_api_key"
-               value="{{ api_settings.openai_api_key }}"
-               placeholder="Enter your OpenAI API key"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-        <p class="mt-1 text-sm text-gray-500">
-          Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-600 hover:underline">OpenAI Platform</a>
-        </p>
-      </div>
+        <!-- OpenAI API Key -->
+        <div>
+          <label for="openai_api_key" class="block text-sm font-medium text-gray-700 mb-2">
+            OpenAI API Key
+          </label>
+          <input type="password"
+                 name="openai_api_key"
+                 id="openai_api_key"
+                 value="{{ api_settings.openai_api_key }}"
+                 placeholder="Enter your OpenAI API key"
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
+          <p class="mt-1 text-sm text-gray-500">
+            Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" class="text-green-600 hover:underline">OpenAI Platform</a>
+          </p>
+        </div>
 
-      <!-- Status Indicators -->
-      <div class="pt-4 border-t border-gray-200">
-        <h3 class="text-sm font-medium text-gray-700 mb-3">Status</h3>
-        <div class="flex space-x-6">
-          <div class="flex items-center">
-            {% if api_settings.gemini_api_key %}
-              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-              <span class="text-sm text-gray-600">Gemini configured</span>
-            {% else %}
-              <span class="w-2 h-2 bg-gray-300 rounded-full mr-2"></span>
-              <span class="text-sm text-gray-500">Gemini not configured</span>
-            {% endif %}
-          </div>
-          <div class="flex items-center">
-            {% if api_settings.openai_api_key %}
-              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-              <span class="text-sm text-gray-600">OpenAI configured</span>
-            {% else %}
-              <span class="w-2 h-2 bg-gray-300 rounded-full mr-2"></span>
-              <span class="text-sm text-gray-500">OpenAI not configured</span>
-            {% endif %}
+        <!-- Status Indicators -->
+        <div class="pt-4 border-t border-gray-200">
+          <h3 class="text-sm font-medium text-gray-700 mb-3">Status</h3>
+          <div class="flex space-x-6">
+            <div class="flex items-center">
+              {% if api_settings.gemini_api_key %}
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                <span class="text-sm text-gray-600">Gemini configured</span>
+              {% else %}
+                <span class="w-2 h-2 bg-gray-300 rounded-full mr-2"></span>
+                <span class="text-sm text-gray-500">Gemini not configured</span>
+              {% endif %}
+            </div>
+            <div class="flex items-center">
+              {% if api_settings.openai_api_key %}
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                <span class="text-sm text-gray-600">OpenAI configured</span>
+              {% else %}
+                <span class="w-2 h-2 bg-gray-300 rounded-full mr-2"></span>
+                <span class="text-sm text-gray-500">OpenAI not configured</span>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Submit Button -->
-      <div class="pt-4">
-        <button type="submit"
-                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-          Save Settings
-        </button>
+    <!-- Models Tab -->
+    <div id="content-models" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-2xl hidden">
+      <h2 class="text-lg font-medium text-gray-800 mb-6">Model Configuration</h2>
+
+      <div class="space-y-6">
+        <!-- Generation Model -->
+        <div>
+          <label for="gemini_model" class="block text-sm font-medium text-gray-700 mb-2">
+            Generation Model
+          </label>
+          <select name="gemini_model"
+                  id="gemini_model"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+            {% for value, label in gemini_model_choices %}
+              <option value="{{ value }}" {% if api_settings.gemini_model == value %}selected{% endif %}>
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
+          <p class="mt-1 text-sm text-gray-500">
+            Gemini model used for image generation.
+          </p>
+        </div>
+
+        <!-- Critic Model -->
+        <div>
+          <label for="critic_model" class="block text-sm font-medium text-gray-700 mb-2">
+            Critic Model
+          </label>
+          <select name="critic_model"
+                  id="critic_model"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+            {% for value, label in critic_model_choices %}
+              <option value="{{ value }}" {% if api_settings.critic_model == value %}selected{% endif %}>
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
+          <p class="mt-1 text-sm text-gray-500">
+            Gemini model used for image quality critique.
+          </p>
+        </div>
+
+        <!-- Critic Max Retries -->
+        <div>
+          <label for="critic_max_retries" class="block text-sm font-medium text-gray-700 mb-2">
+            Critic Max Retries
+          </label>
+          <input type="number"
+                 name="critic_max_retries"
+                 id="critic_max_retries"
+                 value="{{ api_settings.critic_max_retries }}"
+                 min="0"
+                 max="10"
+                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
+          <p class="mt-1 text-sm text-gray-500">
+            Number of retries on rate limit errors (0-10). Uses exponential backoff.
+          </p>
+        </div>
       </div>
-    </form>
-  </div>
+    </div>
+
+    <!-- Master Prompt Tab -->
+    <div id="content-prompt" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-4xl hidden">
+      <h2 class="text-lg font-medium text-gray-800 mb-2">Master Prompt</h2>
+      <p class="text-sm text-gray-500 mb-6">
+        This prompt is appended to every image generation request. It defines brand guidelines, tone, and style rules.
+      </p>
+
+      <!-- Collapsible Section -->
+      <div class="border border-gray-200 rounded-lg">
+        <button type="button"
+                onclick="togglePromptEditor()"
+                class="w-full flex items-center justify-between px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 rounded-t-lg transition-colors">
+          <span class="text-sm font-medium text-gray-700">Edit Master Prompt</span>
+          <svg id="prompt-chevron" class="w-5 h-5 text-gray-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
+
+        <div id="prompt-editor" class="hidden p-4 border-t border-gray-200">
+          <textarea name="master_prompt"
+                    id="master_prompt"
+                    rows="12"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors font-mono text-sm"
+                    placeholder="Enter your master prompt...">{{ api_settings.master_prompt|default:default_master_prompt }}</textarea>
+
+          <div class="mt-3 flex justify-between items-center">
+            <button type="button"
+                    onclick="resetToDefault()"
+                    class="text-sm text-gray-500 hover:text-gray-700 underline">
+              Reset to Default
+            </button>
+            <span class="text-xs text-gray-400">Supports plain text formatting</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="mt-6">
+      <button type="submit"
+              class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium">
+        Save Settings
+      </button>
+    </div>
+  </form>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+const defaultPrompt = `{{ default_master_prompt|escapejs }}`;
+
+function switchTab(tab) {
+  const tabs = ['api', 'models', 'prompt'];
+  const activeClass = 'px-6 py-3 text-sm font-medium border-b-2 border-green-500 text-green-600 -mb-px';
+  const inactiveClass = 'px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px';
+
+  tabs.forEach(t => {
+    document.getElementById('tab-' + t).className = (t === tab) ? activeClass : inactiveClass;
+    document.getElementById('content-' + t).classList.toggle('hidden', t !== tab);
+  });
+}
+
+function togglePromptEditor() {
+  const editor = document.getElementById('prompt-editor');
+  const chevron = document.getElementById('prompt-chevron');
+  editor.classList.toggle('hidden');
+  chevron.classList.toggle('rotate-180');
+}
+
+function resetToDefault() {
+  if (confirm('Reset master prompt to default? Your changes will be lost.')) {
+    document.getElementById('master_prompt').value = defaultPrompt;
+  }
+}
+</script>
+{% endblock extra_js %}

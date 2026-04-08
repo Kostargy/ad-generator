@@ -191,6 +191,34 @@ class Ad(models.Model):
         help_text="Stores generation context (prompt, references) for revisions",
     )
 
+    # Critique results from ImageCritic
+    critique_score = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Overall quality score (1-10) from ImageCritic",
+    )
+    critique_passed = models.BooleanField(
+        default=True,
+        help_text="Whether image passed all 7 quality checks",
+    )
+    critique_summary = models.TextField(
+        blank=True,
+        help_text="Summary of critique result",
+    )
+    critique_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Full CritiqueResult data for analysis",
+    )
+    was_auto_revised = models.BooleanField(
+        default=False,
+        help_text="Whether this image was auto-revised by critique system",
+    )
+    revision_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of auto-revisions performed",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -217,6 +245,12 @@ class APISettings(models.Model):
         ("gemini-3-pro-image-preview", "Gemini 3 Pro Image Preview (Professional)"),
     ]
 
+    CRITIC_MODEL_CHOICES = [
+        ("gemini-2.0-flash", "Gemini 2.0 Flash (Fast)"),
+        ("gemini-2.5-flash-preview-05-20", "Gemini 2.5 Flash Preview"),
+        ("gemini-2.5-pro-preview-05-06", "Gemini 2.5 Pro Preview"),
+    ]
+
     primary_provider = models.CharField(
         max_length=20,
         choices=PROVIDER_CHOICES,
@@ -231,7 +265,28 @@ class APISettings(models.Model):
         default="gemini-2.5-flash-image",
         help_text="Gemini model to use for image generation",
     )
+    critic_model = models.CharField(
+        max_length=100,
+        choices=CRITIC_MODEL_CHOICES,
+        default="gemini-2.0-flash",
+        help_text="Model for image quality critique",
+    )
+    critic_max_retries = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="Max retries for critic API rate limits (0-10)",
+    )
+    master_prompt = models.TextField(
+        blank=True,
+        default="",
+        help_text="Master prompt instructions for image generation",
+    )
     updated_at = models.DateTimeField(auto_now=True)
+
+    DEFAULT_MASTER_PROMPT = """BRAND: Everdries leakproof underwear for women 65+. Tone: warm, relatable, empowering — never clinical or patronizing. No Trustpilot references. No 'premium' messaging. Do NOT include any logo or brand mark in the image.
+
+BACKGROUND INTEGRATION: Blend the ad background seamlessly with the model photo's existing background. Avoid jarring color contrasts.
+
+TEXT AMOUNT: Less text often performs better. You do NOT need every feature listed above. Only include copy that fits naturally."""
 
     class Meta:
         verbose_name = "API Settings"
