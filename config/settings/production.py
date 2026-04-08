@@ -2,6 +2,7 @@
 from .base import *  # noqa: F403
 from .base import APPS_DIR
 from .base import DATABASES
+from .base import REDIS_SSL
 from .base import REDIS_URL
 from .base import env
 
@@ -18,16 +19,23 @@ DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
 # CACHES
 # ------------------------------------------------------------------------------
+_redis_options: dict = {
+    "CLIENT_CLASS": "django_redis.client.DefaultClient",
+    # Mimicking memcache behavior.
+    # https://github.com/jazzband/django-redis#memcached-exceptions-behavior
+    "IGNORE_EXCEPTIONS": True,
+}
+if REDIS_SSL:
+    # Heroku Redis uses self-signed certs.
+    import ssl
+
+    _redis_options["CONNECTION_POOL_KWARGS"] = {"ssl_cert_reqs": ssl.CERT_NONE}
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            # Mimicking memcache behavior.
-            # https://github.com/jazzband/django-redis#memcached-exceptions-behavior
-            "IGNORE_EXCEPTIONS": True,
-        },
+        "OPTIONS": _redis_options,
     },
 }
 

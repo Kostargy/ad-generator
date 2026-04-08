@@ -282,6 +282,12 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes for image generation tasks
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes soft limit
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+# Heroku Redis (rediss://) uses self-signed certs; Celery requires explicit ssl_cert_reqs.
+if REDIS_SSL:
+    import ssl
+
+    CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+    CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-beat_scheduler
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
