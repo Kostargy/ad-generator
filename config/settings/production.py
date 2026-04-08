@@ -76,57 +76,39 @@ SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
 
 # STATIC & MEDIA
 # ------------------------------------------------------------------------------
-# Optional S3-compatible object storage (Cloudflare R2, AWS S3, Tigris, etc.)
-# If DJANGO_AWS_STORAGE_BUCKET_NAME is set, all media + static files are
-# uploaded to the bucket. Otherwise, fall back to WhiteNoise for static files
-# and the local filesystem for media (NOTE: ephemeral on Heroku dynos).
-if env("DJANGO_AWS_STORAGE_BUCKET_NAME", default=""):
-    AWS_ACCESS_KEY_ID = env("DJANGO_AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = env("DJANGO_AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = env("DJANGO_AWS_STORAGE_BUCKET_NAME")
+# Static files always go through WhiteNoise (works on Heroku, no S3 round-trip).
+# Media files: if a Bucketeer addon is provisioned (BUCKETEER_BUCKET_NAME is set),
+# upload to its S3 bucket. Otherwise fall back to local filesystem (ephemeral).
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+STATIC_URL = "/static/"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = str(APPS_DIR / "media")
+
+if env("BUCKETEER_BUCKET_NAME", default=""):
+    AWS_ACCESS_KEY_ID = env("BUCKETEER_AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = env("BUCKETEER_AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = env("BUCKETEER_BUCKET_NAME")
+    AWS_S3_REGION_NAME = env("BUCKETEER_AWS_REGION", default="us-east-1")
     AWS_QUERYSTRING_AUTH = False
-    _AWS_EXPIRY = 60 * 60 * 24 * 7
+    AWS_S3_FILE_OVERWRITE = False
     AWS_S3_OBJECT_PARAMETERS = {
-        "CacheControl": f"max-age={_AWS_EXPIRY}, s-maxage={_AWS_EXPIRY}, must-revalidate",
+        "CacheControl": "max-age=604800, public",
     }
-    AWS_S3_MAX_MEMORY_SIZE = env.int(
-        "DJANGO_AWS_S3_MAX_MEMORY_SIZE",
-        default=100_000_000,  # 100MB
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "location": "media",
+            "file_overwrite": False,
+        },
+    }
+    MEDIA_URL = (
+        f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/media/"
     )
-    AWS_S3_REGION_NAME = env("DJANGO_AWS_S3_REGION_NAME", default=None)
-    # S3-compatible endpoint URL (for Cloudflare R2, Tigris, etc.)
-    AWS_S3_ENDPOINT_URL = env("DJANGO_AWS_S3_ENDPOINT_URL", default=None)
-    AWS_S3_CUSTOM_DOMAIN = env("DJANGO_AWS_S3_CUSTOM_DOMAIN", default=None)
-    aws_s3_domain = AWS_S3_CUSTOM_DOMAIN or f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-    STORAGES = {
-        "default": {
-            "BACKEND": "storages.backends.s3.S3Storage",
-            "OPTIONS": {
-                "location": "media",
-                "file_overwrite": False,
-            },
-        },
-        "staticfiles": {
-            "BACKEND": "storages.backends.s3.S3Storage",
-            "OPTIONS": {
-                "location": "static",
-                "default_acl": "public-read",
-            },
-        },
-    }
-    MEDIA_URL = f"https://{aws_s3_domain}/media/"
-    STATIC_URL = f"https://{aws_s3_domain}/static/"
-else:
-    # WhiteNoise for static files; local filesystem for media (ephemeral on Heroku)
-    STORAGES = {
-        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-        "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-        },
-    }
-    STATIC_URL = "/static/"
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = str(APPS_DIR / "media")
 
 # EMAIL
 # ------------------------------------------------------------------------------
