@@ -1,23 +1,41 @@
 """
-Adapter to convert Django Generator model to image-gen GenerationPrompt objects.
+Adapter to convert Django Generator model to GenerationPrompt objects.
 """
 
 from __future__ import annotations
 
-import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-# Add image-gen to path
-IMAGE_GEN_PATH = Path(__file__).resolve().parents[4] / "image-gen"
-if str(IMAGE_GEN_PATH) not in sys.path:
-    sys.path.insert(0, str(IMAGE_GEN_PATH))
-
-from image_gen.prompt_builder import GenerationPrompt
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from everdries_ad_generator.campaigns.models import Generator
+
+
+@dataclass
+class GenerationPrompt:
+    """A single fully-resolved prompt ready to send to the image model."""
+
+    prompt_text: str
+    reference_images: list[Path] = field(default_factory=list)
+    logo_images: list[Path] = field(default_factory=list)
+    style_reference: Path | None = None
+    product_name: str = ""
+    image_prompt_name: str = ""
+    aspect_ratio: str = ""
+    style_variant: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "prompt_text": self.prompt_text,
+            "reference_images": [str(p) for p in self.reference_images],
+            "logo_images": [str(p) for p in self.logo_images],
+            "style_reference": str(self.style_reference) if self.style_reference else None,
+            "product_name": self.product_name,
+            "image_prompt_name": self.image_prompt_name,
+            "aspect_ratio": self.aspect_ratio,
+            "style_variant": self.style_variant,
+        }
 
 # Dimension to aspect ratio mapping
 DIMENSION_TO_ASPECT = {

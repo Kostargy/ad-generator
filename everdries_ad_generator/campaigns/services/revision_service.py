@@ -6,19 +6,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from django.conf import settings
 
-# Add image-gen to path
-IMAGE_GEN_PATH = Path(__file__).resolve().parents[4] / "image-gen"
-if str(IMAGE_GEN_PATH) not in sys.path:
-    sys.path.insert(0, str(IMAGE_GEN_PATH))
-
-from image_gen.config import load_config
-from image_gen.generator import ImageGenerator, RevisionContext
+from .image_gen import ImageGenerator, RevisionContext
 
 if TYPE_CHECKING:
     from everdries_ad_generator.campaigns.models import Ad
@@ -27,18 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 class RevisionService:
-    """Handles ad image revisions using the image-gen library."""
+    """Handles ad image revisions using the local image_gen package."""
 
     def __init__(self, ad: "Ad"):
         self.ad = ad
-        self.config = load_config(IMAGE_GEN_PATH / "config.yaml")
         self.output_dir = Path(settings.MEDIA_ROOT) / "revisions" / str(ad.id)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Settings loaded from database
+        self._gemini_model: str | None = None
+        self._primary_provider: str = "gemini"
+        self._fallback_provider: str = "openai"
 
-    def _load_api_settings(self):
+    def _load_api_settings(self) -> None:
         """Load API keys and model settings from database."""
-        import os
-
         from everdries_ad_generator.campaigns.models import APISettings
 
         api_settings = APISettings.get_settings()
@@ -47,24 +42,24 @@ class RevisionService:
         if api_settings.openai_api_key:
             os.environ["OPENAI_API_KEY"] = api_settings.openai_api_key
 
-        # Override model from database settings
-        if api_settings.gemini_model:
-            self.config.gemini.image_model_name = api_settings.gemini_model
-            logger.info("Using Gemini model: %s", api_settings.gemini_model)
+        # Store model from database settings
+        self._gemini_model = api_settings.gemini_model or None
+        if self._gemini_model:
+            logger.info("Using Gemini model: %s", self._gemini_model)
 
         # Set provider priority
         if api_settings.primary_provider == "openai":
-            self.config.primary_provider = "openai"
-            self.config.fallback_provider = "gemini"
+            self._primary_provider = "openai"
+            self._fallback_provider = "gemini"
         elif api_settings.primary_provider == "gemini":
-            self.config.primary_provider = "gemini"
-            self.config.fallback_provider = "openai"
+            self._primary_provider = "gemini"
+            self._fallback_provider = "openai"
         elif api_settings.primary_provider == "gemini_only":
-            self.config.primary_provider = "gemini"
-            self.config.fallback_provider = "none"
+            self._primary_provider = "gemini"
+            self._fallback_provider = "none"
         elif api_settings.primary_provider == "openai_only":
-            self.config.primary_provider = "openai"
-            self.config.fallback_provider = "none"
+            self._primary_provider = "openai"
+            self._fallback_provider = "none"
 
     def _build_context(self) -> RevisionContext:
         """Build RevisionContext from ad.generation_metadata."""
@@ -106,10 +101,11 @@ class RevisionService:
     ) -> Path:
         """Run the actual revision asynchronously."""
         generator = ImageGenerator(
-            config=self.config.gemini,
             output_dir=self.output_dir,
             checkpoint_dir=self.output_dir / "checkpoints",
-            app_config=self.config,
+            gemini_model=self._gemini_model,
+            primary_provider=self._primary_provider,
+            fallback_provider=self._fallback_provider,
         )
 
         revised_path = await generator.revise_image(

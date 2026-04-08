@@ -6,22 +6,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.files import File
 
-# Add image-gen to path for generator (still needed for image generation)
-IMAGE_GEN_PATH = Path(__file__).resolve().parents[4] / "image-gen"
-if str(IMAGE_GEN_PATH) not in sys.path:
-    sys.path.insert(0, str(IMAGE_GEN_PATH))
-
-from image_gen.config import load_config
-from image_gen.generator import GeneratedImage, ImageGenerator, RevisionContext
-
 from .critic_service import CritiqueResult, ImageCritic
+from .image_gen import GeneratedImage, ImageGenerator, RevisionContext
 from .image_gen_adapter import ImageGenAdapter
 
 if TYPE_CHECKING:
@@ -36,16 +29,17 @@ class GenerationService:
     def __init__(self, generator: "Generator"):
         self.generator = generator
         self.adapter = ImageGenAdapter(generator)
-        self.config = load_config(IMAGE_GEN_PATH / "config.yaml")
         self.output_dir = Path(settings.MEDIA_ROOT) / "generated" / str(generator.id)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.critic = ImageCritic()
         self.image_generator: ImageGenerator | None = None
+        # Settings loaded from database
+        self._gemini_model: str | None = None
+        self._primary_provider: str = "gemini"
+        self._fallback_provider: str = "openai"
 
-    def _load_api_settings(self):
+    def _load_api_settings(self) -> None:
         """Load API keys and model settings from database."""
-        import os
-
         from everdries_ad_generator.campaigns.models import APISettings
 
         api_settings = APISettings.get_settings()
@@ -54,27 +48,27 @@ class GenerationService:
         if api_settings.openai_api_key:
             os.environ["OPENAI_API_KEY"] = api_settings.openai_api_key
 
-        # Override model from database settings
-        if api_settings.gemini_model:
-            self.config.gemini.image_model_name = api_settings.gemini_model
-            logger.info("Using Gemini model: %s", api_settings.gemini_model)
+        # Store model from database settings
+        self._gemini_model = api_settings.gemini_model or None
+        if self._gemini_model:
+            logger.info("Using Gemini model: %s", self._gemini_model)
 
         # Set provider priority
         if api_settings.primary_provider == "openai":
-            self.config.primary_provider = "openai"
-            self.config.fallback_provider = "gemini"
+            self._primary_provider = "openai"
+            self._fallback_provider = "gemini"
             logger.info("Primary provider: OpenAI, fallback: Gemini")
         elif api_settings.primary_provider == "gemini":
-            self.config.primary_provider = "gemini"
-            self.config.fallback_provider = "openai"
+            self._primary_provider = "gemini"
+            self._fallback_provider = "openai"
             logger.info("Primary provider: Gemini, fallback: OpenAI")
         elif api_settings.primary_provider == "gemini_only":
-            self.config.primary_provider = "gemini"
-            self.config.fallback_provider = "none"
+            self._primary_provider = "gemini"
+            self._fallback_provider = "none"
             logger.info("Primary provider: Gemini only (no fallback)")
         elif api_settings.primary_provider == "openai_only":
-            self.config.primary_provider = "openai"
-            self.config.fallback_provider = "none"
+            self._primary_provider = "openai"
+            self._fallback_provider = "none"
             logger.info("Primary provider: OpenAI only (no fallback)")
 
     def run(self) -> list["Ad"]:
@@ -145,10 +139,11 @@ class GenerationService:
     async def _generate_images(self, prompts: list) -> list[GeneratedImage]:
         """Generate images asynchronously (no Django ORM calls here)."""
         self.image_generator = ImageGenerator(
-            config=self.config.gemini,
             output_dir=self.output_dir,
             checkpoint_dir=self.output_dir / "checkpoints",
-            app_config=self.config,
+            gemini_model=self._gemini_model,
+            primary_provider=self._primary_provider,
+            fallback_provider=self._fallback_provider,
         )
         return await self.image_generator.generate_batch(prompts=prompts, dry_run=False)
 
