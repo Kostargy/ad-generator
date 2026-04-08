@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,10 +28,24 @@ class RevisionService:
         self.ad = ad
         self.output_dir = Path(settings.MEDIA_ROOT) / "revisions" / str(ad.id)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Holds a downloaded copy of the ad's current image when storage is remote.
+        self._tmp_dir = tempfile.TemporaryDirectory(prefix="revise_")
         # Settings loaded from database
         self._gemini_model: str | None = None
         self._primary_provider: str = "gemini"
         self._fallback_provider: str = "openai"
+
+    def _materialize_current_image(self) -> Path:
+        """Return a local Path for the ad's current image, downloading from remote storage if needed."""
+        try:
+            return Path(self.ad.image.path)
+        except NotImplementedError:
+            suffix = Path(self.ad.image.name).suffix or ".png"
+            local_path = Path(self._tmp_dir.name) / f"current{suffix}"
+            with self.ad.image.open("rb") as src, local_path.open("wb") as dst:
+                for chunk in src.chunks():
+                    dst.write(chunk)
+            return local_path
 
     def _load_api_settings(self) -> None:
         """Load API keys and model settings from database."""
@@ -85,10 +100,10 @@ class RevisionService:
         context = self._build_context()
         logger.info("Revision context: %s", context.summary())
 
-        # Get current image path
+        # Get current image path (downloads from S3 if remote)
         if not self.ad.image:
             raise ValueError("Ad has no image to revise")
-        image_path = Path(self.ad.image.path)
+        image_path = self._materialize_current_image()
 
         # Run async revision
         revised_path = asyncio.run(self._revise_async(image_path, instructions, context))
