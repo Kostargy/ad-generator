@@ -37,12 +37,16 @@ class RevisionService:
 
     def _materialize_current_image(self) -> Path:
         """Return a local Path for the ad's current image, downloading from remote storage if needed."""
+        return self._materialize_image_field(self.ad.image, "current")
+
+    def _materialize_image_field(self, image_field, basename: str) -> Path:
+        """Download an ImageField to a temp file when storage is remote."""
         try:
-            return Path(self.ad.image.path)
+            return Path(image_field.path)
         except NotImplementedError:
-            suffix = Path(self.ad.image.name).suffix or ".png"
-            local_path = Path(self._tmp_dir.name) / f"current{suffix}"
-            with self.ad.image.open("rb") as src, local_path.open("wb") as dst:
+            suffix = Path(image_field.name).suffix or ".png"
+            local_path = Path(self._tmp_dir.name) / f"{basename}{suffix}"
+            with image_field.open("rb") as src, local_path.open("wb") as dst:
                 for chunk in src.chunks():
                     dst.write(chunk)
             return local_path
@@ -77,13 +81,35 @@ class RevisionService:
             self._fallback_provider = "none"
 
     def _build_context(self) -> RevisionContext:
-        """Build RevisionContext from ad.generation_metadata."""
+        """Build RevisionContext: reference assets come from the Generator's M2M
+        fields (durable), prompt/aspect/etc from the stored generation_metadata.
+        """
         meta = self.ad.generation_metadata or {}
+        generator = self.ad.generator
+
+        # Materialize product references (downloaded from S3 to /tmp if remote)
+        reference_images: list[Path] = []
+        for asset in generator.product_references.all():
+            if asset.image:
+                reference_images.append(
+                    self._materialize_image_field(asset.image, f"ref_{asset.pk}")
+                )
+
+        # Pick the same style reference variant the original generation used
+        style_reference: Path | None = None
+        style_assets = list(generator.style_references.all())
+        if style_assets:
+            idx = meta.get("style_variant", 0) or 0
+            chosen = style_assets[idx] if 0 <= idx < len(style_assets) else style_assets[0]
+            if chosen.image:
+                style_reference = self._materialize_image_field(
+                    chosen.image, f"style_{chosen.pk}"
+                )
 
         return RevisionContext(
-            reference_images=[Path(p) for p in meta.get("reference_image_paths", []) if p],
+            reference_images=reference_images,
             logo_images=[],
-            style_reference=Path(meta["style_reference_path"]) if meta.get("style_reference_path") else None,
+            style_reference=style_reference,
             prompt_text=meta.get("prompt_text", ""),
             aspect_ratio=meta.get("aspect_ratio", "1:1"),
             product_name=meta.get("product_name", ""),
