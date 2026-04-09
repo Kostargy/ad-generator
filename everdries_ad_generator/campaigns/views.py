@@ -640,6 +640,17 @@ def persona_edit(request, persona_id):
 
 @login_required
 @require_POST
+def generator_delete(request, campaign_id, generator_id):
+    """Delete a generator and its ads via AJAX."""
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+    generator = get_object_or_404(Generator, id=generator_id, campaign=campaign)
+    title = generator.title
+    generator.delete()
+    return JsonResponse({"status": "success", "message": f"Generator '{title}' deleted."})
+
+
+@login_required
+@require_POST
 def persona_delete(request, persona_id):
     """Delete a persona via AJAX."""
     persona = get_object_or_404(CustomerPersona, id=persona_id, created_by=request.user)

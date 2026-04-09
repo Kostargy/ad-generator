@@ -116,6 +116,13 @@
                  class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors inline-block">
                 Duplicate
               </a>
+              <button type="button"
+                      data-delete-generator
+                      data-delete-url="{% url 'campaigns:generator_delete' campaign.id generator.id %}"
+                      data-generator-title="{{ generator.title }}"
+                      class="px-3 py-1 border border-red-300 rounded-md text-sm text-red-600 hover:bg-red-50 transition-colors inline-block">
+                Delete
+              </button>
             </td>
           </tr>
           {% empty %}
@@ -181,6 +188,37 @@ document.querySelector('[data-export-btn]').addEventListener('click', function()
     console.error('Export error:', err);
     alert('Export failed. Make sure there are approved images to export.');
   });
+});
+
+// Delete a generator (delegated so dynamically-injected rows still work).
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-delete-generator]');
+  if (!btn) return;
+  e.stopPropagation();
+  e.preventDefault();
+  const title = btn.getAttribute('data-generator-title') || 'this generator';
+  if (!confirm(`Delete "${title}"? This will remove the generator and all its ads. This cannot be undone.`)) {
+    return;
+  }
+  const url = btn.getAttribute('data-delete-url');
+  btn.disabled = true;
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'Accept': 'application/json',
+    },
+  })
+    .then(r => {
+      if (!r.ok) throw new Error('Delete failed');
+      const row = btn.closest('tr[data-generator-id]');
+      if (row) row.remove();
+    })
+    .catch(err => {
+      console.error('Failed to delete generator:', err);
+      alert('Failed to delete generator. Please try again.');
+      btn.disabled = false;
+    });
 });
 
 // Adaptive polling: 5s while any row is processing, 60s otherwise.
