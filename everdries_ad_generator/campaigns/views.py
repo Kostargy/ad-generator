@@ -329,6 +329,7 @@ def generator_create(request, campaign_id):
         title = request.POST.get("title", "").strip()
         brief = request.POST.get("brief", "").strip()
         headlines = request.POST.get("headlines", "").strip()
+        supplementary_copy = request.POST.get("supplementary_copy", "").strip()
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
         product_ref_ids = request.POST.getlist("product_references")
@@ -362,6 +363,7 @@ def generator_create(request, campaign_id):
             title=title,
             brief=brief,
             headlines=headlines,
+            supplementary_copy=supplementary_copy,
             customer_persona=persona,
             number_of_ads=number_of_ads,
             dimensions=dimensions,
@@ -479,6 +481,43 @@ def generate_headlines(request, campaign_id):
 
 
 @login_required
+@require_POST
+def generate_supplementary_copy(request, campaign_id):
+    """Generate feature/benefit supplementary copy lines using AI."""
+    from .services.headline_service import SupplementaryCopyGenerator
+
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    count = data.get("count", 5)
+    brief = data.get("brief", "")
+    headlines = data.get("headlines", "")
+    persona_id = data.get("persona_id")
+
+    persona_description = ""
+    if persona_id:
+        persona = CustomerPersona.objects.filter(id=persona_id, created_by=request.user).first()
+        if persona:
+            persona_description = persona.description
+
+    generator = SupplementaryCopyGenerator()
+    lines = generator.generate(
+        product_name=campaign.name,
+        product_context=campaign.description,
+        persona_description=persona_description,
+        brief=brief,
+        headlines=headlines,
+        count=count,
+    )
+
+    return JsonResponse({"supplementary_copy": lines})
+
+
+@login_required
 def generator_edit(request, campaign_id, generator_id):
     """Edit an existing generator."""
     campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
@@ -492,6 +531,7 @@ def generator_edit(request, campaign_id, generator_id):
         title = request.POST.get("title", "").strip()
         brief = request.POST.get("brief", "").strip()
         headlines = request.POST.get("headlines", "").strip()
+        supplementary_copy = request.POST.get("supplementary_copy", "").strip()
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
         product_ref_ids = request.POST.getlist("product_references")
@@ -523,6 +563,7 @@ def generator_edit(request, campaign_id, generator_id):
         generator.title = title
         generator.brief = brief
         generator.headlines = headlines
+        generator.supplementary_copy = supplementary_copy
         generator.customer_persona = persona
         generator.number_of_ads = number_of_ads
         generator.dimensions = dimensions

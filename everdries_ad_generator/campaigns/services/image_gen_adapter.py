@@ -60,6 +60,7 @@ class GeneratorConfig:
     product_name: str
     product_context: str
     headlines: list[str]
+    supplementary_copy: list[str]
     brief: str
     product_reference_paths: list[Path]
     style_reference_paths: list[Path]
@@ -100,6 +101,11 @@ class ImageGenAdapter:
             headlines=[
                 line.strip()
                 for line in (self.generator.headlines or "").split("\n")
+                if line.strip()
+            ],
+            supplementary_copy=[
+                line.strip()
+                for line in (self.generator.supplementary_copy or "").split("\n")
                 if line.strip()
             ],
             brief=self.generator.brief or "",
@@ -220,37 +226,69 @@ class ImageGenAdapter:
             f'do NOT add any second headline or alternate version):\n"{headline}"'
         )
 
-        # Text content rules — image must show ONLY the single headline above.
-        # Style references are for layout/composition only, never a license to
-        # invent additional copy.
+        # Optional supplementary copy — feature callouts / benefit lines that
+        # render in smaller supporting type alongside the headline. Handles
+        # both shapes: a single tagline OR a multi-line bulleted list.
+        supp = cfg.supplementary_copy
+        has_supp = bool(supp)
+        if has_supp:
+            if len(supp) == 1:
+                supp_block = (
+                    f'\nSUPPLEMENTARY COPY (render exactly as written, in '
+                    f'smaller supporting type around or beneath the headline '
+                    f'— do NOT paraphrase, do NOT add other lines):\n'
+                    f'"{supp[0]}"'
+                )
+            else:
+                bullet_lines = "\n".join(f'- "{line}"' for line in supp)
+                supp_block = (
+                    "\nSUPPLEMENTARY COPY (render each of the following lines "
+                    "exactly as written, as small supporting callouts/bullets "
+                    "around or beneath the headline — do NOT paraphrase, do "
+                    "NOT merge them, do NOT add other lines):\n"
+                    f"{bullet_lines}"
+                )
+            parts.append(supp_block)
+
+        # Text content rules — image must show ONLY the single headline above
+        # plus any supplementary copy lines provided. Style references are for
+        # layout/composition only, never a license to invent additional copy.
+        if has_supp:
+            allowed_text = (
+                "the single HEADLINE TEXT above plus the SUPPLEMENTARY COPY "
+                "lines above"
+            )
+        else:
+            allowed_text = "the single HEADLINE TEXT above"
+
         if has_style_ref:
             parts.append(
                 "\nTEXT CONTENT RULES (STRICT):\n"
-                "- The single HEADLINE TEXT above is the ONLY text that may "
-                "appear in the image. Spell it exactly as written.\n"
+                f"- The ONLY text that may appear in the image is "
+                f"{allowed_text}. Spell every word exactly as written.\n"
                 "- Use the style reference for LAYOUT, COMPOSITION, "
                 "TYPOGRAPHY and COLOR ONLY. Do NOT copy any text from the "
                 "style reference.\n"
                 "- If the style reference contains slots for prices, badges, "
-                "CTAs, taglines, brand marks, or any other copy, leave those "
-                "slots EMPTY or omit them entirely. Do NOT invent copy to "
-                "fill them.\n"
-                "- Do NOT render multiple headlines, alternate versions, "
-                "subtitles, or variations of the headline. Exactly one "
-                "headline string appears in the final image."
+                "CTAs, taglines, brand marks, or any other copy beyond what "
+                "is allowed above, leave those slots EMPTY or omit them "
+                "entirely. Do NOT invent copy to fill them.\n"
+                "- Do NOT render multiple headlines, alternate versions, or "
+                "variations of the headline. Exactly one headline string "
+                "appears in the final image."
             )
         else:
             parts.append(
                 "\nTEXT CONTENT RULES (STRICT):\n"
-                "- The single HEADLINE TEXT above is the ONLY text that may "
-                "appear in the image. Spell it exactly as written.\n"
-                "- Do NOT add any additional text: no prices, no CTAs "
-                "('Shop Now', 'Buy', 'Order Today'), no taglines, no promo "
-                "badges, no brand name, no website, no hashtags, no "
-                "disclaimers, no subtitles. The headline is the entire copy.\n"
+                f"- The ONLY text that may appear in the image is "
+                f"{allowed_text}. Spell every word exactly as written.\n"
+                "- Do NOT add any other text: no prices, no CTAs "
+                "('Shop Now', 'Buy', 'Order Today'), no extra taglines, no "
+                "promo badges, no brand name, no website, no hashtags, no "
+                "disclaimers, no subtitles beyond what is allowed above.\n"
                 "- Do NOT render multiple headlines, alternate versions, or "
-                "variations. Exactly one headline string appears in the "
-                "final image."
+                "variations of the headline. Exactly one headline string "
+                "appears in the final image."
             )
 
         # Brief/additional creative direction.

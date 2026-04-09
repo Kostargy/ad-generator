@@ -1,8 +1,9 @@
 """
-Headline generation service.
+Headline and supplementary-copy generation service.
 
-Uses Gemini/OpenAI to generate ad headlines based on product and campaign data.
-Supports fallback between providers based on settings.
+Uses Gemini/OpenAI to generate ad headlines and supporting feature/benefit
+copy based on product and campaign data. Supports fallback between providers
+based on settings.
 """
 
 from __future__ import annotations
@@ -255,4 +256,105 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
         # All providers failed
         error_summary = "; ".join(errors)
         logger.error("All providers failed for headline generation: %s", error_summary)
+        return f"Error: All providers failed. {error_summary}"
+
+
+class SupplementaryCopyGenerator(HeadlineGenerator):
+    """Generates short feature/benefit callout lines that sit alongside the headline.
+
+    Reuses HeadlineGenerator's provider/fallback/sanitizer plumbing — only the
+    system prompt and the public method name differ.
+    """
+
+    SYSTEM_PROMPT = """# Ad Supplementary Copy Generator
+
+You are an expert advertising copywriter for {product_name}.
+
+## Target Persona
+{persona_description}
+
+## Product Context
+{product_context}
+
+## Campaign Brief
+{brief}
+
+## Brand Guidelines
+{master_prompt}
+
+## Existing Headlines (for tone reference — do NOT repeat these)
+{headlines}
+
+## Instructions
+- Generate exactly {number_of_lines} short supplementary copy lines.
+- These are FEATURE CALLOUTS / BENEFIT LINES that sit alongside a headline on
+  an ad image — things like "Leak-proof for 12 hours", "Machine washable",
+  "Free shipping", "30-day guarantee".
+- Keep each line VERY short: 2-6 words ideal, 8 words max. They must fit on
+  an ad as small supporting text.
+- Each line stands alone — no connectors, no punctuation between lines.
+- Variety: mix concrete features, benefits, social proof, and reassurance.
+- Do NOT repeat or paraphrase any of the existing headlines above.
+
+Output ONLY the lines, one per line. No numbering, no bullet points, no explanations."""
+
+    def generate(  # type: ignore[override]
+        self,
+        product_name: str,
+        product_context: str,
+        persona_description: str,
+        brief: str,
+        headlines: str = "",
+        count: int = 5,
+    ) -> str:
+        """Generate supplementary copy lines using configured provider with fallback."""
+        self._load_settings()
+
+        if not self._gemini_api_key and not self._openai_api_key:
+            logger.error("No API keys configured for supplementary copy generation")
+            return "Error: No API keys configured. Please add Gemini or OpenAI API key in Settings."
+
+        prompt = self.SYSTEM_PROMPT.format(
+            product_name=product_name or "the product",
+            product_context=product_context or "No additional context provided.",
+            persona_description=persona_description or "General audience.",
+            brief=brief or "Generate general supporting copy.",
+            master_prompt=self._master_prompt or "No specific brand guidelines.",
+            headlines=headlines.strip() or "(none provided)",
+            number_of_lines=count,
+        )
+
+        if self._primary_provider in ("openai", "openai_only"):
+            providers = [("openai", self._generate_with_openai)]
+            if self._primary_provider == "openai" and self._gemini_api_key:
+                providers.append(("gemini", self._generate_with_gemini))
+        else:
+            providers = [("gemini", self._generate_with_gemini)]
+            if self._primary_provider == "gemini" and self._openai_api_key:
+                providers.append(("openai", self._generate_with_openai))
+
+        providers = [
+            (name, func) for name, func in providers
+            if (name == "gemini" and self._gemini_api_key) or (name == "openai" and self._openai_api_key)
+        ]
+
+        if not providers:
+            return "Error: No valid API keys for configured providers."
+
+        errors = []
+        for provider_name, generate_func in providers:
+            try:
+                logger.info("Generating supplementary copy with %s", provider_name)
+                result = generate_func(prompt)
+                logger.info("Supplementary copy generated successfully with %s", provider_name)
+                return self._sanitize_output(result, count)
+            except Exception as e:
+                errors.append(f"{provider_name}: {e}")
+                logger.warning("Supplementary copy generation failed with %s: %s", provider_name, e)
+                if len(providers) > 1:
+                    logger.info("Falling back to next provider...")
+                continue
+
+        error_summary = "; ".join(errors)
+        logger.error("All providers failed for supplementary copy generation: %s", error_summary)
         return f"Error: All providers failed. {error_summary}"

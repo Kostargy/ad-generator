@@ -129,6 +129,10 @@ class Generator(models.Model):
     title = models.CharField(max_length=255)
     brief = models.TextField(blank=True)
     headlines = models.TextField(blank=True, help_text="Headlines for the ads, one per line")
+    supplementary_copy = models.TextField(
+        blank=True,
+        help_text="Feature callouts / supporting copy lines, one per line. Rendered alongside the headline on every ad.",
+    )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
