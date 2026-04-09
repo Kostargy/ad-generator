@@ -206,8 +206,36 @@ class ImageGenAdapter:
                 "product/model photos from the separate reference images."
             )
 
-        # The headline/creative direction
-        parts.append(f"\nIMAGE DIRECTION:\n{headline}")
+        # The headline — must be transcribed exactly, not paraphrased
+        parts.append(
+            f'\nHEADLINE TEXT (transcribe letter-perfect, do NOT paraphrase '
+            f'or auto-correct):\n"{headline}"'
+        )
+
+        # Text content rules — image must show ONLY the headline, unless a
+        # style reference dictates a layout that includes other text.
+        if has_style_ref:
+            parts.append(
+                "\nTEXT CONTENT RULES:\n"
+                "- The HEADLINE TEXT above is the primary copy and must "
+                "appear in the ad, spelled exactly as written.\n"
+                "- Follow the style reference for layout, including any "
+                "additional text elements (price boxes, badges, CTAs) that "
+                "appear in the style reference. Reproduce those slots in "
+                "the same positions, but you may leave them blank if you "
+                "do not have copy for them. Do NOT invent extra promotional "
+                "copy beyond what the style reference shows."
+            )
+        else:
+            parts.append(
+                "\nTEXT CONTENT RULES:\n"
+                "- The HEADLINE TEXT above is the ONLY text that may appear "
+                "in the image. Spell it exactly as written.\n"
+                "- Do NOT add any additional text: no prices, no CTAs "
+                "('Shop Now', 'Buy', 'Order Today'), no taglines, no promo "
+                "badges, no brand name, no website, no hashtags, no "
+                "disclaimers. The headline is the entire copy."
+            )
 
         # Brief/additional instructions
         if cfg.brief:
@@ -225,7 +253,12 @@ class ImageGenAdapter:
         if master_prompt:
             parts.append(f"\nGLOBAL GUIDELINES:\n{master_prompt}")
 
-        parts.append("\nGenerate a high-quality advertisement image.")
+        parts.append(
+            "\nGenerate a high-quality advertisement image. Double-check "
+            "that every letter of the HEADLINE TEXT is spelled correctly "
+            "and that no extra text has been added beyond what the TEXT "
+            "CONTENT RULES allow."
+        )
 
         return "\n".join(parts)
 
