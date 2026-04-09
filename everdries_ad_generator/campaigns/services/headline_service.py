@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -144,6 +145,37 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
         except Exception as e:
             raise RuntimeError(f"OpenAI generation failed: {e}")
 
+    @staticmethod
+    def _sanitize_output(raw: str, count: int) -> str:
+        """Clean model output into one headline per line.
+
+        Strips numbering, bullets, surrounding quotes, and any preamble/blank
+        lines so each line is exactly one headline ready to feed the image
+        generator (which builds one ad per line).
+        """
+        lines = []
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # Drop leading numbering ("1.", "1)", "1:") or bullets ("-", "*", "•").
+            line = re.sub(r"^\s*(?:[-*•]|\d+[.)\]:])\s*", "", line)
+            # Drop "Headline 1:" / "Option 2 -" style prefixes.
+            line = re.sub(
+                r"^\s*(?:headline|option|variation|variant)\s*\d*\s*[:\-–—]\s*",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            )
+            # Strip a single pair of wrapping quotes.
+            if len(line) >= 2 and line[0] in {'"', "'", "“", "‘"} and line[-1] in {'"', "'", "”", "’"}:
+                line = line[1:-1].strip()
+            # Skip preamble lines like "Here are 5 headlines:".
+            if not line or line.endswith(":"):
+                continue
+            lines.append(line)
+        return "\n".join(lines[:count])
+
     def generate(
         self,
         product_name: str,
@@ -209,7 +241,7 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
                 logger.info("Generating headlines with %s", provider_name)
                 result = generate_func(prompt)
                 logger.info("Headlines generated successfully with %s", provider_name)
-                return result
+                return self._sanitize_output(result, count)
             except Exception as e:
                 error_msg = f"{provider_name}: {e}"
                 errors.append(error_msg)

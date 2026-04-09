@@ -185,9 +185,15 @@ class ImageGenAdapter:
         # Intro
         parts.append(f"Create a social media advertisement image for {cfg.product_name}.")
 
-        # Product context from campaign description
+        # Product context from campaign description.
+        # Framed as background info ONLY — must not be rendered as on-image text.
         if cfg.product_context:
-            parts.append(f"\nPRODUCT CONTEXT:\n{cfg.product_context}")
+            parts.append(
+                "\nPRODUCT CONTEXT (background information for your understanding "
+                "ONLY — do NOT transcribe, paraphrase, or render any of this text "
+                "into the image):\n"
+                f"{cfg.product_context}"
+            )
 
         # Reference image instructions
         parts.append(
@@ -206,40 +212,56 @@ class ImageGenAdapter:
                 "product/model photos from the separate reference images."
             )
 
-        # The headline — must be transcribed exactly, not paraphrased
+        # The headline — must be transcribed exactly, not paraphrased.
+        # Emphasise that this is THE single piece of copy, not one of many.
         parts.append(
-            f'\nHEADLINE TEXT (transcribe letter-perfect, do NOT paraphrase '
-            f'or auto-correct):\n"{headline}"'
+            f'\nHEADLINE TEXT (this is the ONE AND ONLY headline for this ad — '
+            f'transcribe letter-perfect, do NOT paraphrase or auto-correct, '
+            f'do NOT add any second headline or alternate version):\n"{headline}"'
         )
 
-        # Text content rules — image must show ONLY the headline, unless a
-        # style reference dictates a layout that includes other text.
+        # Text content rules — image must show ONLY the single headline above.
+        # Style references are for layout/composition only, never a license to
+        # invent additional copy.
         if has_style_ref:
             parts.append(
-                "\nTEXT CONTENT RULES:\n"
-                "- The HEADLINE TEXT above is the primary copy and must "
-                "appear in the ad, spelled exactly as written.\n"
-                "- Follow the style reference for layout, including any "
-                "additional text elements (price boxes, badges, CTAs) that "
-                "appear in the style reference. Reproduce those slots in "
-                "the same positions, but you may leave them blank if you "
-                "do not have copy for them. Do NOT invent extra promotional "
-                "copy beyond what the style reference shows."
+                "\nTEXT CONTENT RULES (STRICT):\n"
+                "- The single HEADLINE TEXT above is the ONLY text that may "
+                "appear in the image. Spell it exactly as written.\n"
+                "- Use the style reference for LAYOUT, COMPOSITION, "
+                "TYPOGRAPHY and COLOR ONLY. Do NOT copy any text from the "
+                "style reference.\n"
+                "- If the style reference contains slots for prices, badges, "
+                "CTAs, taglines, brand marks, or any other copy, leave those "
+                "slots EMPTY or omit them entirely. Do NOT invent copy to "
+                "fill them.\n"
+                "- Do NOT render multiple headlines, alternate versions, "
+                "subtitles, or variations of the headline. Exactly one "
+                "headline string appears in the final image."
             )
         else:
             parts.append(
-                "\nTEXT CONTENT RULES:\n"
-                "- The HEADLINE TEXT above is the ONLY text that may appear "
-                "in the image. Spell it exactly as written.\n"
+                "\nTEXT CONTENT RULES (STRICT):\n"
+                "- The single HEADLINE TEXT above is the ONLY text that may "
+                "appear in the image. Spell it exactly as written.\n"
                 "- Do NOT add any additional text: no prices, no CTAs "
                 "('Shop Now', 'Buy', 'Order Today'), no taglines, no promo "
                 "badges, no brand name, no website, no hashtags, no "
-                "disclaimers. The headline is the entire copy."
+                "disclaimers, no subtitles. The headline is the entire copy.\n"
+                "- Do NOT render multiple headlines, alternate versions, or "
+                "variations. Exactly one headline string appears in the "
+                "final image."
             )
 
-        # Brief/additional instructions
+        # Brief/additional creative direction.
+        # Framed as direction ONLY — must not be rendered as on-image text.
         if cfg.brief:
-            parts.append(f"\n{cfg.brief}")
+            parts.append(
+                "\nCREATIVE BRIEF (creative direction for the visual treatment "
+                "ONLY — do NOT transcribe, paraphrase, or render any of this "
+                "text into the image):\n"
+                f"{cfg.brief}"
+            )
 
         # Aspect ratio
         parts.append(f"\nASPECT RATIO: {cfg.aspect_ratio}")
