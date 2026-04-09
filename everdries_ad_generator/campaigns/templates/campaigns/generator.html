@@ -190,12 +190,13 @@ document.querySelector('[data-export-btn]').addEventListener('click', function()
   });
 });
 
-// Delete a generator (delegated so dynamically-injected rows still work).
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('[data-delete-generator]');
-  if (!btn) return;
+// Delete a generator. Attached directly to the button so the listener
+// runs in the target phase and stopPropagation actually stops the row's
+// inline onclick from navigating to the ads page.
+function handleDeleteGeneratorClick(e) {
   e.stopPropagation();
   e.preventDefault();
+  const btn = e.currentTarget;
   const title = btn.getAttribute('data-generator-title') || 'this generator';
   if (!confirm(`Delete "${title}"? This will remove the generator and all its ads. This cannot be undone.`)) {
     return;
@@ -219,6 +220,10 @@ document.addEventListener('click', function(e) {
       alert('Failed to delete generator. Please try again.');
       btn.disabled = false;
     });
+}
+
+document.querySelectorAll('[data-delete-generator]').forEach(btn => {
+  btn.addEventListener('click', handleDeleteGeneratorClick);
 });
 
 // Adaptive polling: 5s while any row is processing, 60s otherwise.
