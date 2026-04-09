@@ -274,14 +274,13 @@ function addMessageToUI(message) {
 }
 
 function refreshImage(imageUrl, imageUpdated) {
-  if (imageUpdated && imageUpdated !== lastImageUpdate) {
-    const img = document.getElementById('ad-image');
-    if (img && imageUrl) {
-      // Add cache buster to force reload
-      img.src = imageUrl + '?t=' + Date.now();
-      lastImageUpdate = imageUpdated;
-    }
-  }
+  const img = document.getElementById('ad-image');
+  if (!img || !imageUrl) return;
+  // Append a cache buster correctly even when imageUrl is a signed S3 URL
+  // that already contains a query string.
+  const sep = imageUrl.includes('?') ? '&' : '?';
+  img.src = imageUrl + sep + 't=' + Date.now();
+  if (imageUpdated) lastImageUpdate = imageUpdated;
 }
 
 function pollForResponse() {
