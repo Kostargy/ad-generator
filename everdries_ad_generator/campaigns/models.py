@@ -158,6 +158,10 @@ class Generator(models.Model):
     placement = models.CharField(max_length=50, blank=True)
     is_template = models.BooleanField(default=False)
 
+    # Progress tracking — populated when a generation run starts.
+    total_expected = models.PositiveIntegerField(default=0)
+    started_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

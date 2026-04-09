@@ -61,6 +61,8 @@ def generator_statuses(request, campaign_id):
                 "status": g.status,
                 "ads_count": g.ads_count,
                 "approved_count": g.approved_count,
+                "total_expected": g.total_expected,
+                "started_at": g.started_at.isoformat() if g.started_at else None,
             }
             for g in generators
         ]

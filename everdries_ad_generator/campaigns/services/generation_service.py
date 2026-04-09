@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.files import File
+from django.utils import timezone
 
 from .critic_service import CritiqueResult, ImageCritic
 from .image_gen import GeneratedImage, ImageGenerator, RevisionContext
@@ -85,17 +86,27 @@ class GenerationService:
             # Step 0: Load API keys and model settings from database
             self._load_api_settings()
 
-            # Step 1: Mark processing (sync, before async)
-            self.generator.status = Generator.STATUS_PROCESSING
-            self.generator.save(update_fields=["status", "updated_at"])
-
-            # Step 2: Build prompts (sync)
+            # Step 1: Build prompts (sync) so we know the real total
             prompts = self.adapter.build_prompts()
             if not prompts:
                 logger.warning("No prompts for Generator %s", self.generator.id)
                 self.generator.status = Generator.STATUS_FAILED
                 self.generator.save(update_fields=["status", "updated_at"])
                 return ads_created
+
+            # Step 2: Mark processing with progress fields populated.
+            # Reset ads count is implicit because the row count is read live.
+            self.generator.status = Generator.STATUS_PROCESSING
+            self.generator.started_at = timezone.now()
+            self.generator.total_expected = len(prompts)
+            self.generator.save(
+                update_fields=[
+                    "status",
+                    "started_at",
+                    "total_expected",
+                    "updated_at",
+                ]
+            )
 
             logger.info(
                 "Generating %d images for Generator %s",

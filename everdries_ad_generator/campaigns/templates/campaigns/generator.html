@@ -70,13 +70,18 @@
               {% if generator.status == 'completed' %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed</span>
               {% elif generator.status == 'processing' %}
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                     data-progress
+                     data-done="{{ generator.ads_count }}"
+                     data-total="{{ generator.total_expected }}"
+                     data-started="{% if generator.started_at %}{{ generator.started_at|date:'c' }}{% endif %}">
                   <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Processing
-                </span>
+                  <span data-progress-text>{{ generator.ads_count }} / {{ generator.total_expected }}</span>
+                  <span class="ml-1.5 text-blue-600/70" data-progress-eta></span>
+                </div>
               {% elif generator.status == 'failed' %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>
               {% else %}
@@ -178,11 +183,21 @@ document.querySelector('[data-export-btn]').addEventListener('click', function()
   });
 });
 
-// Poll generator statuses every 60 seconds
-setInterval(pollGeneratorStatuses, 60000);
+// Adaptive polling: 5s while any row is processing, 60s otherwise.
+function schedulePoll() {
+  const anyProcessing = !!document.querySelector('[data-progress]');
+  const interval = anyProcessing ? 5000 : 60000;
+  setTimeout(async () => { await pollGeneratorStatuses(); schedulePoll(); }, interval);
+}
+schedulePoll();
+
+// Local 1s tick keeps the ETA countdown smooth between polls.
+setInterval(() => {
+  document.querySelectorAll('[data-progress]').forEach(recomputeProgress);
+}, 1000);
 
 function pollGeneratorStatuses() {
-  fetch('{% url "campaigns:generator_statuses" campaign.id %}')
+  return fetch('{% url "campaigns:generator_statuses" campaign.id %}')
     .then(r => r.json())
     .then(data => {
       data.generators.forEach(g => updateGeneratorRow(g));
@@ -197,7 +212,9 @@ function updateGeneratorRow(generator) {
   // Update status badge
   const statusCell = row.querySelector('[data-status-cell]');
   if (statusCell) {
-    statusCell.innerHTML = getStatusBadgeHTML(generator.status);
+    statusCell.innerHTML = getStatusBadgeHTML(generator);
+    const progressEl = statusCell.querySelector('[data-progress]');
+    if (progressEl) recomputeProgress(progressEl);
   }
 
   // Update approved count
@@ -240,23 +257,54 @@ function updateGeneratorRow(generator) {
   }
 }
 
-function getStatusBadgeHTML(status) {
-  switch (status) {
+function getStatusBadgeHTML(generator) {
+  switch (generator.status) {
     case 'completed':
       return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed</span>';
     case 'processing':
-      return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+      return `<div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                   data-progress
+                   data-done="${generator.ads_count || 0}"
+                   data-total="${generator.total_expected || 0}"
+                   data-started="${generator.started_at || ''}">
         <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        Processing
-      </span>`;
+        <span data-progress-text>${generator.ads_count || 0} / ${generator.total_expected || 0}</span>
+        <span class="ml-1.5 text-blue-600/70" data-progress-eta></span>
+      </div>`;
     case 'failed':
       return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>';
     default:
       return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Pending</span>';
   }
+}
+
+function formatETA(s) {
+  if (s < 60) return `~${Math.max(1, Math.round(s))}s left`;
+  if (s < 3600) return `~${Math.round(s / 60)}m left`;
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s - h * 3600) / 60);
+  return `~${h}h ${m}m left`;
+}
+
+function recomputeProgress(el) {
+  const done = parseInt(el.dataset.done || '0', 10);
+  const total = parseInt(el.dataset.total || '0', 10);
+  const startedStr = el.dataset.started || '';
+  const textEl = el.querySelector('[data-progress-text]');
+  const etaEl = el.querySelector('[data-progress-eta]');
+  if (textEl) textEl.textContent = `${done} / ${total}`;
+  if (!etaEl) return;
+  if (!startedStr || total === 0) { etaEl.textContent = ''; return; }
+  if (done === 0) { etaEl.textContent = '· calculating…'; return; }
+  if (done >= total) { etaEl.textContent = '· finishing…'; return; }
+  const elapsed = (Date.now() - new Date(startedStr).getTime()) / 1000;
+  if (elapsed <= 0) { etaEl.textContent = '· calculating…'; return; }
+  const avg = elapsed / done;
+  const remaining = (total - done) * avg;
+  etaEl.textContent = `· ${formatETA(remaining)}`;
 }
 </script>
 {% endblock content %}
