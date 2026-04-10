@@ -1,0 +1,71 @@
+{% comment %}
+Reusable asset upload modal. Include once per page. Triggered from any
+button via openAssetModal('style' | 'model' | 'flat_lay' | ...).
+The current asset_type is held in the hidden #asset_type input.
+{% endcomment %}
+<div id="assetModal"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 id="assetModalTitle" class="text-lg font-medium text-gray-800">Upload Asset</h3>
+      <button type="button"
+              onclick="closeAssetModal()"
+              class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <form id="assetForm" enctype="multipart/form-data">
+      <div class="px-6 py-4">
+        <input type="hidden" id="asset_type" name="asset_type" value="">
+
+        <div class="mb-4">
+          <label for="asset_name" class="block text-sm font-medium text-gray-700 mb-1">
+            Name <span class="text-gray-400 font-normal">(optional, ignored when uploading multiple)</span>
+          </label>
+          <input type="text"
+                 id="asset_name"
+                 name="name"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                 placeholder="Leave blank to use filename">
+        </div>
+
+        <div class="mb-4">
+          <label for="asset_image" class="block text-sm font-medium text-gray-700 mb-1">
+            Image(s) <span class="text-red-500">*</span>
+          </label>
+          <input type="file"
+                 id="asset_image"
+                 name="image"
+                 accept="image/*"
+                 multiple
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+          <div id="asset_preview" class="mt-2 hidden">
+            <img id="asset_preview_img" src="" alt="Preview" class="w-full h-64 object-contain rounded border border-gray-200">
+          </div>
+          <div id="asset_multi_summary" class="mt-2 hidden text-sm text-gray-600"></div>
+        </div>
+
+        <div id="asset_error" class="hidden text-red-500 text-sm mb-4"></div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+        <button type="button"
+                onclick="closeAssetModal()"
+                class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+          Cancel
+        </button>
+        <button type="button"
+                onclick="uploadAsset()"
+                class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
+          Upload
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

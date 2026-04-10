@@ -6,8 +6,9 @@ from .models import APISettings
 from .models import Asset
 from .models import Campaign
 from .models import CustomerPersona
+from .models import FlatLayReference
 from .models import Generator
-from .models import ProductReference
+from .models import ModelReference
 from .models import StyleReference
 
 
@@ -54,9 +55,14 @@ class StyleReferenceAdmin(_AssetTypeAdmin):
     asset_type = Asset.TYPE_STYLE
 
 
-@admin.register(ProductReference)
-class ProductReferenceAdmin(_AssetTypeAdmin):
-    asset_type = Asset.TYPE_PRODUCT
+@admin.register(ModelReference)
+class ModelReferenceAdmin(_AssetTypeAdmin):
+    asset_type = Asset.TYPE_MODEL
+
+
+@admin.register(FlatLayReference)
+class FlatLayReferenceAdmin(_AssetTypeAdmin):
+    asset_type = Asset.TYPE_FLAT_LAY
 
 
 @admin.register(Generator)

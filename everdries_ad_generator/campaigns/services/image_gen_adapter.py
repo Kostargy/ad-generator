@@ -62,7 +62,8 @@ class GeneratorConfig:
     headlines: list[str]
     supplementary_copy: list[str]
     brief: str
-    product_reference_paths: list[Path]
+    model_reference_paths: list[Path]
+    flat_lay_reference_paths: list[Path]
     style_reference_paths: list[Path]
     aspect_ratio: str
     persona_description: str = ""
@@ -109,9 +110,14 @@ class ImageGenAdapter:
                 if line.strip()
             ],
             brief=self.generator.brief or "",
-            product_reference_paths=[
+            model_reference_paths=[
                 self._materialize_asset(asset)
-                for asset in self.generator.product_references.all()
+                for asset in self.generator.model_references.all()
+                if asset.image
+            ],
+            flat_lay_reference_paths=[
+                self._materialize_asset(asset)
+                for asset in self.generator.flat_lay_references.all()
                 if asset.image
             ],
             style_reference_paths=[
@@ -138,16 +144,20 @@ class ImageGenAdapter:
             return prompts
 
         # Use [None] sentinels so we still emit at least one prompt per headline
-        # when style or product references are absent.
+        # when style or model references are absent.
         style_refs = cfg.style_reference_paths or [None]
-        product_refs = cfg.product_reference_paths or [None]
+        model_refs = cfg.model_reference_paths or [None]
+        # Flat-lays don't add a fan-out dimension — every prompt cell gets the
+        # full set, so the model can use them as detail/color references.
+        flat_lay_refs = cfg.flat_lay_reference_paths
 
         for headline in cfg.headlines:
             for style_idx, style_path in enumerate(style_refs):
-                for prod_idx, prod_path in enumerate(product_refs):
+                for model_idx, model_path in enumerate(model_refs):
                     prompt_text = self._format_prompt(
                         headline=headline,
                         has_style_ref=style_path is not None,
+                        has_flat_lays=bool(flat_lay_refs),
                     )
 
                     # Build a name that distinguishes each cell in the fan-out
@@ -155,14 +165,21 @@ class ImageGenAdapter:
                     name_parts = [headline[:40]]
                     if len(style_refs) > 1 and style_path:
                         name_parts.append(f"v{style_idx + 1}")
-                    if len(product_refs) > 1 and prod_path:
-                        name_parts.append(f"p{prod_idx + 1}")
+                    if len(model_refs) > 1 and model_path:
+                        name_parts.append(f"m{model_idx + 1}")
                     name = " ".join(name_parts)
+
+                    # Reference images = the single model image for this cell
+                    # (if any) followed by every flat-lay shot the user uploaded.
+                    cell_refs: list[Path] = []
+                    if model_path:
+                        cell_refs.append(model_path)
+                    cell_refs.extend(flat_lay_refs)
 
                     prompts.append(
                         GenerationPrompt(
                             prompt_text=prompt_text,
-                            reference_images=[prod_path] if prod_path else [],
+                            reference_images=cell_refs,
                             logo_images=[],
                             style_reference=style_path,
                             product_name=cfg.product_name,
@@ -183,7 +200,12 @@ class ImageGenAdapter:
         except Exception:
             return ""
 
-    def _format_prompt(self, headline: str, has_style_ref: bool = False) -> str:
+    def _format_prompt(
+        self,
+        headline: str,
+        has_style_ref: bool = False,
+        has_flat_lays: bool = False,
+    ) -> str:
         """Build the prompt text for image generation."""
         cfg = self.config
         parts = []
@@ -201,14 +223,32 @@ class ImageGenAdapter:
                 f"{cfg.product_context}"
             )
 
-        # Reference image instructions
-        parts.append(
-            "\nREFERENCE IMAGES (CRITICAL): I have provided labeled product "
-            "reference photos. These are REAL product photos that MUST appear "
-            "in the final ad AS-IS. Do NOT regenerate, redraw, or modify them. "
-            "Place the actual photo into the ad design. Add text and graphics "
-            "AROUND and ON TOP of the real photo."
-        )
+        # Reference image instructions. The first attached image (when one
+        # exists) is a real model-on-product photo that must be embedded
+        # as-is. Any further images are flat-lay / ghost-mannequin shots of
+        # the product alone — used as accurate references for product
+        # detail, color, and texture.
+        if has_flat_lays:
+            parts.append(
+                "\nREFERENCE IMAGES (CRITICAL): I have provided multiple "
+                "reference photos. The FIRST image is a REAL model-on-product "
+                "photo that MUST appear in the final ad AS-IS — do NOT "
+                "regenerate, redraw, or modify it. Place the actual photo "
+                "into the ad design and add text/graphics AROUND and ON TOP "
+                "of it. The REMAINING images are flat-lay / ghost-mannequin "
+                "shots of the product alone — use them as accurate references "
+                "for product detail, color, and texture. Do NOT render the "
+                "flat-lay images as standalone hero shots unless the style "
+                "reference layout explicitly calls for it."
+            )
+        else:
+            parts.append(
+                "\nREFERENCE IMAGES (CRITICAL): I have provided labeled product "
+                "reference photos. These are REAL product photos that MUST appear "
+                "in the final ad AS-IS. Do NOT regenerate, redraw, or modify them. "
+                "Place the actual photo into the ad design. Add text and graphics "
+                "AROUND and ON TOP of the real photo."
+            )
 
         # Style reference instructions
         if has_style_ref:
@@ -327,5 +367,5 @@ class ImageGenAdapter:
         return (
             len(self.config.headlines)
             * max(1, len(self.config.style_reference_paths))
-            * max(1, len(self.config.product_reference_paths))
+            * max(1, len(self.config.model_reference_paths))
         )

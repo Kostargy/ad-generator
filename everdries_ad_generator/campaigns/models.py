@@ -66,10 +66,12 @@ class Asset(models.Model):
     """An image asset for use in ad generation."""
 
     TYPE_STYLE = "style"
-    TYPE_PRODUCT = "product"
+    TYPE_MODEL = "model"
+    TYPE_FLAT_LAY = "flat_lay"
     TYPE_CHOICES = [
         (TYPE_STYLE, "Style Reference"),
-        (TYPE_PRODUCT, "Product Reference"),
+        (TYPE_MODEL, "Model Image"),
+        (TYPE_FLAT_LAY, "Flat-Lay / Ghost Mannequin"),
     ]
 
     name = models.CharField(max_length=255, blank=True)
@@ -98,13 +100,22 @@ class StyleReference(Asset):
         verbose_name_plural = "Style References"
 
 
-class ProductReference(Asset):
-    """Proxy of Asset filtered to product references — for Django admin grouping."""
+class ModelReference(Asset):
+    """Proxy of Asset filtered to model images — for Django admin grouping."""
 
     class Meta:
         proxy = True
-        verbose_name = "Product Reference"
-        verbose_name_plural = "Product References"
+        verbose_name = "Model Image"
+        verbose_name_plural = "Model Images"
+
+
+class FlatLayReference(Asset):
+    """Proxy of Asset filtered to flat-lay / ghost-mannequin shots — for Django admin grouping."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Flat-Lay / Ghost Mannequin"
+        verbose_name_plural = "Flat-Lays / Ghost Mannequins"
 
 
 class Generator(models.Model):
@@ -151,11 +162,17 @@ class Generator(models.Model):
         related_name="generators_as_style",
         limit_choices_to={"asset_type": Asset.TYPE_STYLE},
     )
-    product_references = models.ManyToManyField(
+    model_references = models.ManyToManyField(
         Asset,
         blank=True,
-        related_name="generators_as_product",
-        limit_choices_to={"asset_type": Asset.TYPE_PRODUCT},
+        related_name="generators_as_model",
+        limit_choices_to={"asset_type": Asset.TYPE_MODEL},
+    )
+    flat_lay_references = models.ManyToManyField(
+        Asset,
+        blank=True,
+        related_name="generators_as_flat_lay",
+        limit_choices_to={"asset_type": Asset.TYPE_FLAT_LAY},
     )
     number_of_headlines = models.PositiveIntegerField(default=5)
     number_of_supplementary_copy = models.PositiveIntegerField(default=5)

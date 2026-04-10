@@ -323,7 +323,8 @@ def generator_create(request, campaign_id):
     campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
     personas = CustomerPersona.objects.filter(created_by=request.user)
     style_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_STYLE)
-    product_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_PRODUCT)
+    model_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_MODEL)
+    flat_lay_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_FLAT_LAY)
 
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
@@ -332,7 +333,8 @@ def generator_create(request, campaign_id):
         supplementary_copy = request.POST.get("supplementary_copy", "").strip()
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
-        product_ref_ids = request.POST.getlist("product_references")
+        model_ref_ids = request.POST.getlist("model_references")
+        flat_lay_ref_ids = request.POST.getlist("flat_lay_references")
         number_of_headlines = request.POST.get("number_of_headlines", "5")
         number_of_supplementary_copy = request.POST.get("number_of_supplementary_copy", "5")
         dimensions = request.POST.get("dimensions", "").strip()
@@ -382,9 +384,13 @@ def generator_create(request, campaign_id):
             generator.style_references.set(
                 Asset.objects.filter(id__in=style_ref_ids, created_by=request.user, asset_type=Asset.TYPE_STYLE)
             )
-        if product_ref_ids:
-            generator.product_references.set(
-                Asset.objects.filter(id__in=product_ref_ids, created_by=request.user, asset_type=Asset.TYPE_PRODUCT)
+        if model_ref_ids:
+            generator.model_references.set(
+                Asset.objects.filter(id__in=model_ref_ids, created_by=request.user, asset_type=Asset.TYPE_MODEL)
+            )
+        if flat_lay_ref_ids:
+            generator.flat_lay_references.set(
+                Asset.objects.filter(id__in=flat_lay_ref_ids, created_by=request.user, asset_type=Asset.TYPE_FLAT_LAY)
             )
 
         # Trigger generation task
@@ -414,7 +420,8 @@ def generator_create(request, campaign_id):
         "generator": source,
         "personas": personas,
         "style_assets": style_assets,
-        "product_assets": product_assets,
+        "model_assets": model_assets,
+        "flat_lay_assets": flat_lay_assets,
     }
     return render(request, "campaigns/generator_form.html", context)
 
@@ -530,7 +537,8 @@ def generator_edit(request, campaign_id, generator_id):
     generator = get_object_or_404(Generator, id=generator_id, campaign=campaign)
     personas = CustomerPersona.objects.filter(created_by=request.user)
     style_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_STYLE)
-    product_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_PRODUCT)
+    model_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_MODEL)
+    flat_lay_assets = Asset.objects.filter(created_by=request.user, asset_type=Asset.TYPE_FLAT_LAY)
     view_only = request.GET.get("view") == "true"
 
     if request.method == "POST":
@@ -540,7 +548,8 @@ def generator_edit(request, campaign_id, generator_id):
         supplementary_copy = request.POST.get("supplementary_copy", "").strip()
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
-        product_ref_ids = request.POST.getlist("product_references")
+        model_ref_ids = request.POST.getlist("model_references")
+        flat_lay_ref_ids = request.POST.getlist("flat_lay_references")
         number_of_headlines = request.POST.get("number_of_headlines", "5")
         number_of_supplementary_copy = request.POST.get("number_of_supplementary_copy", "5")
         dimensions = request.POST.get("dimensions", "").strip()
@@ -587,8 +596,11 @@ def generator_edit(request, campaign_id, generator_id):
         generator.style_references.set(
             Asset.objects.filter(id__in=style_ref_ids, created_by=request.user, asset_type=Asset.TYPE_STYLE)
         )
-        generator.product_references.set(
-            Asset.objects.filter(id__in=product_ref_ids, created_by=request.user, asset_type=Asset.TYPE_PRODUCT)
+        generator.model_references.set(
+            Asset.objects.filter(id__in=model_ref_ids, created_by=request.user, asset_type=Asset.TYPE_MODEL)
+        )
+        generator.flat_lay_references.set(
+            Asset.objects.filter(id__in=flat_lay_ref_ids, created_by=request.user, asset_type=Asset.TYPE_FLAT_LAY)
         )
 
         messages.success(request, f"Generator '{title}' updated successfully.")
@@ -603,7 +615,8 @@ def generator_edit(request, campaign_id, generator_id):
         "generator": generator,
         "personas": personas,
         "style_assets": style_assets,
-        "product_assets": product_assets,
+        "model_assets": model_assets,
+        "flat_lay_assets": flat_lay_assets,
     }
     return render(request, "campaigns/generator_form.html", context)
 
@@ -720,7 +733,7 @@ def asset_upload(request):
     asset_type = request.POST.get("asset_type", "").strip()
     image = request.FILES.get("image")
 
-    if asset_type not in [Asset.TYPE_STYLE, Asset.TYPE_PRODUCT]:
+    if asset_type not in [Asset.TYPE_STYLE, Asset.TYPE_MODEL, Asset.TYPE_FLAT_LAY]:
         return JsonResponse({"error": "Invalid asset type."}, status=400)
 
     if not image:

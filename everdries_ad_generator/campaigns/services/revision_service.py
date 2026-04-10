@@ -87,12 +87,19 @@ class RevisionService:
         meta = self.ad.generation_metadata or {}
         generator = self.ad.generator
 
-        # Materialize product references (downloaded from S3 to /tmp if remote)
+        # Materialize model + flat-lay references (downloaded from S3 to /tmp
+        # if remote). Mirrors the composition built by image_gen_adapter so
+        # revisions see the same context as the original generation.
         reference_images: list[Path] = []
-        for asset in generator.product_references.all():
+        for asset in generator.model_references.all():
             if asset.image:
                 reference_images.append(
                     self._materialize_image_field(asset.image, f"ref_{asset.pk}")
+                )
+        for asset in generator.flat_lay_references.all():
+            if asset.image:
+                reference_images.append(
+                    self._materialize_image_field(asset.image, f"flatlay_{asset.pk}")
                 )
 
         # Pick the same style reference variant the original generation used

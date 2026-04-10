@@ -169,87 +169,11 @@
         </div>
       </div>
 
-      <!-- Style References -->
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          Style References
-          <span class="font-normal text-gray-500">(copy the visual layout)</span>
-        </label>
-        <div class="border border-gray-300 rounded-md p-4 {% if view_only %}bg-gray-50{% endif %}">
-          {% if style_assets %}
-          <input type="text"
-                 data-asset-search="style_references"
-                 placeholder="Search style references..."
-                 class="w-full mb-3 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
-          <div class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1 {% if not view_only %}mb-3{% endif %}"
-               data-asset-grid="style_references">
-            {% for asset in style_assets %}
-            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded {% if not view_only %}hover:bg-gray-50 cursor-pointer{% endif %}"
-                   data-asset-name="{{ asset.name|lower }}">
-              <input type="checkbox"
-                     name="style_references"
-                     value="{{ asset.id }}"
-                     {% if generator and asset in generator.style_references.all %}checked{% endif %}
-                     class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded"
-                     {% if view_only %}disabled{% endif %}>
-              <img src="{{ asset.image.url }}" alt="{{ asset.name }}" class="w-20 h-20 object-cover rounded">
-              <span class="text-sm text-gray-700 truncate">{{ asset.name }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          {% else %}
-          <p class="text-sm text-gray-500 {% if not view_only %}mb-3{% endif %}">No style references uploaded yet.</p>
-          {% endif %}
-          {% if not view_only %}
-          <button type="button"
-                  onclick="openAssetModal('style')"
-                  class="text-sm text-green-600 hover:text-green-700 font-medium">
-            + Upload Style Reference
-          </button>
-          {% endif %}
-        </div>
-      </div>
+      {% include "campaigns/partials/_asset_section.html" with section_id="style_references" section_label="Style References" section_help="copy the visual layout" assets=style_assets selected_qs=generator.style_references.all upload_type="style" add_label="Upload Style Reference" view_only=view_only %}
 
-      <!-- Product References -->
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          Product References
-          <span class="font-normal text-gray-500">(use this product in the generated image)</span>
-        </label>
-        <div class="border border-gray-300 rounded-md p-4 {% if view_only %}bg-gray-50{% endif %}">
-          {% if product_assets %}
-          <input type="text"
-                 data-asset-search="product_references"
-                 placeholder="Search product references..."
-                 class="w-full mb-3 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
-          <div class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1 {% if not view_only %}mb-3{% endif %}"
-               data-asset-grid="product_references">
-            {% for asset in product_assets %}
-            <label class="flex items-center space-x-3 p-2 border border-gray-200 rounded {% if not view_only %}hover:bg-gray-50 cursor-pointer{% endif %}"
-                   data-asset-name="{{ asset.name|lower }}">
-              <input type="checkbox"
-                     name="product_references"
-                     value="{{ asset.id }}"
-                     {% if generator and asset in generator.product_references.all %}checked{% endif %}
-                     class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded"
-                     {% if view_only %}disabled{% endif %}>
-              <img src="{{ asset.image.url }}" alt="{{ asset.name }}" class="w-20 h-20 object-cover rounded">
-              <span class="text-sm text-gray-700 truncate">{{ asset.name }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          {% else %}
-          <p class="text-sm text-gray-500 {% if not view_only %}mb-3{% endif %}">No product references uploaded yet.</p>
-          {% endif %}
-          {% if not view_only %}
-          <button type="button"
-                  onclick="openAssetModal('product')"
-                  class="text-sm text-green-600 hover:text-green-700 font-medium">
-            + Upload Product Reference
-          </button>
-          {% endif %}
-        </div>
-      </div>
+      {% include "campaigns/partials/_asset_section.html" with section_id="model_references" section_label="Model Images" section_help="real photos of a model wearing the product" assets=model_assets selected_qs=generator.model_references.all upload_type="model" add_label="Upload Model Image" view_only=view_only %}
+
+      {% include "campaigns/partials/_asset_section.html" with section_id="flat_lay_references" section_label="Flat-Lay / Ghost Mannequin" section_help="product-only shots used as detail/color reference" assets=flat_lay_assets selected_qs=generator.flat_lay_references.all upload_type="flat_lay" add_label="Upload Flat-Lay Image" view_only=view_only %}
 
       <!-- Dimensions -->
       <div class="mb-6">
@@ -322,73 +246,7 @@
   </div>
 </div>
 
-<!-- Asset Upload Modal -->
-<div id="assetModal"
-     class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-  <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-    <!-- Modal Header -->
-    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-      <h3 id="assetModalTitle" class="text-lg font-medium text-gray-800">Upload Asset</h3>
-      <button type="button"
-              onclick="closeAssetModal()"
-              class="text-gray-400 hover:text-gray-600">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Modal Body -->
-    <form id="assetForm" enctype="multipart/form-data">
-      <div class="px-6 py-4">
-        <input type="hidden" id="asset_type" name="asset_type" value="">
-
-        <div class="mb-4">
-          <label for="asset_name" class="block text-sm font-medium text-gray-700 mb-1">
-            Name <span class="text-gray-400 font-normal">(optional, ignored when uploading multiple)</span>
-          </label>
-          <input type="text"
-                 id="asset_name"
-                 name="name"
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                 placeholder="Leave blank to use filename">
-        </div>
-
-        <div class="mb-4">
-          <label for="asset_image" class="block text-sm font-medium text-gray-700 mb-1">
-            Image(s) <span class="text-red-500">*</span>
-          </label>
-          <input type="file"
-                 id="asset_image"
-                 name="image"
-                 accept="image/*"
-                 multiple
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
-          <div id="asset_preview" class="mt-2 hidden">
-            <img id="asset_preview_img" src="" alt="Preview" class="w-full h-64 object-contain rounded border border-gray-200">
-          </div>
-          <div id="asset_multi_summary" class="mt-2 hidden text-sm text-gray-600"></div>
-        </div>
-
-        <div id="asset_error" class="hidden text-red-500 text-sm mb-4"></div>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-        <button type="button"
-                onclick="closeAssetModal()"
-                class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-          Cancel
-        </button>
-        <button type="button"
-                onclick="uploadAsset()"
-                class="px-4 py-2 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 transition-colors">
-          Upload
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
+{% include "campaigns/partials/_asset_upload_modal.html" %}
 
 <!-- Persona Modal -->
 <div id="personaModal"
@@ -562,8 +420,12 @@
     document.getElementById('asset_multi_summary').classList.add('hidden');
     document.getElementById('asset_error').classList.add('hidden');
 
-    const title = type === 'style' ? 'Upload Style Reference' : 'Upload Product Reference';
-    document.getElementById('assetModalTitle').textContent = title;
+    const titles = {
+      style: 'Upload Style Reference',
+      model: 'Upload Model Image',
+      flat_lay: 'Upload Flat-Lay / Ghost Mannequin',
+    };
+    document.getElementById('assetModalTitle').textContent = titles[type] || 'Upload Asset';
 
     document.getElementById('assetModal').classList.remove('hidden');
     document.getElementById('assetModal').classList.add('flex');
@@ -668,7 +530,8 @@
   }
 
   function addAssetCheckbox(asset, type) {
-    const fieldName = type === 'style' ? 'style_references' : 'product_references';
+    // type is 'style' | 'model' | 'flat_lay' — field name follows the same pattern.
+    const fieldName = `${type}_references`;
     // Find the container - look for the grid or create one
     const section = document.querySelector(`input[name="${fieldName}"]`)?.closest('.border.border-gray-300') ||
                     document.querySelector(`button[onclick="openAssetModal('${type}')"]`)?.closest('.border.border-gray-300');
