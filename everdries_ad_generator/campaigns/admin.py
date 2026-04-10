@@ -61,7 +61,7 @@ class ProductReferenceAdmin(_AssetTypeAdmin):
 
 @admin.register(Generator)
 class GeneratorAdmin(admin.ModelAdmin):
-    list_display = ["title", "campaign", "status", "customer_persona", "number_of_ads", "created_at"]
+    list_display = ["title", "campaign", "status", "customer_persona", "number_of_headlines", "number_of_supplementary_copy", "created_at"]
     list_filter = ["status", "campaign", "created_at"]
     search_fields = ["title", "brief"]
 

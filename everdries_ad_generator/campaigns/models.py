@@ -157,7 +157,8 @@ class Generator(models.Model):
         related_name="generators_as_product",
         limit_choices_to={"asset_type": Asset.TYPE_PRODUCT},
     )
-    number_of_ads = models.PositiveIntegerField(default=5)
+    number_of_headlines = models.PositiveIntegerField(default=5)
+    number_of_supplementary_copy = models.PositiveIntegerField(default=5)
     dimensions = models.CharField(max_length=50, blank=True)
     placement = models.CharField(max_length=50, blank=True)
     is_template = models.BooleanField(default=False)

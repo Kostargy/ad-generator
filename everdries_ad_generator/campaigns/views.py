@@ -333,7 +333,8 @@ def generator_create(request, campaign_id):
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
         product_ref_ids = request.POST.getlist("product_references")
-        number_of_ads = request.POST.get("number_of_ads", "5")
+        number_of_headlines = request.POST.get("number_of_headlines", "5")
+        number_of_supplementary_copy = request.POST.get("number_of_supplementary_copy", "5")
         dimensions = request.POST.get("dimensions", "").strip()
         placement = request.POST.get("placement", "").strip()
         is_template = request.POST.get("is_template") == "on"
@@ -343,11 +344,15 @@ def generator_create(request, campaign_id):
             messages.error(request, "Title is required.")
             return redirect("campaigns:generator_create", campaign_id=campaign_id)
 
-        # Parse number_of_ads
+        # Parse counts
         try:
-            number_of_ads = int(number_of_ads)
+            number_of_headlines = int(number_of_headlines)
         except ValueError:
-            number_of_ads = 5
+            number_of_headlines = 5
+        try:
+            number_of_supplementary_copy = int(number_of_supplementary_copy)
+        except ValueError:
+            number_of_supplementary_copy = 5
 
         # Get persona if selected
         persona = None
@@ -365,7 +370,8 @@ def generator_create(request, campaign_id):
             headlines=headlines,
             supplementary_copy=supplementary_copy,
             customer_persona=persona,
-            number_of_ads=number_of_ads,
+            number_of_headlines=number_of_headlines,
+            number_of_supplementary_copy=number_of_supplementary_copy,
             dimensions=dimensions,
             placement=placement,
             is_template=is_template,
@@ -458,7 +464,7 @@ def generate_headlines(request, campaign_id):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    number_of_ads = data.get("number_of_ads", 5)
+    count = data.get("number_of_headlines", 5)
     brief = data.get("brief", "")
     persona_id = data.get("persona_id")
 
@@ -474,7 +480,7 @@ def generate_headlines(request, campaign_id):
         product_context=campaign.description,
         persona_description=persona_description,
         brief=brief,
-        count=number_of_ads,
+        count=count,
     )
 
     return JsonResponse({"headlines": headlines})
@@ -493,7 +499,7 @@ def generate_supplementary_copy(request, campaign_id):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    count = data.get("count", 5)
+    count = data.get("number_of_supplementary_copy", 5)
     brief = data.get("brief", "")
     headlines = data.get("headlines", "")
     persona_id = data.get("persona_id")
@@ -535,7 +541,8 @@ def generator_edit(request, campaign_id, generator_id):
         persona_id = request.POST.get("customer_persona", "").strip()
         style_ref_ids = request.POST.getlist("style_references")
         product_ref_ids = request.POST.getlist("product_references")
-        number_of_ads = request.POST.get("number_of_ads", "5")
+        number_of_headlines = request.POST.get("number_of_headlines", "5")
+        number_of_supplementary_copy = request.POST.get("number_of_supplementary_copy", "5")
         dimensions = request.POST.get("dimensions", "").strip()
         placement = request.POST.get("placement", "").strip()
         is_template = request.POST.get("is_template") == "on"
@@ -545,11 +552,15 @@ def generator_edit(request, campaign_id, generator_id):
             messages.error(request, "Title is required.")
             return redirect("campaigns:generator_edit", campaign_id=campaign_id, generator_id=generator_id)
 
-        # Parse number_of_ads
+        # Parse counts
         try:
-            number_of_ads = int(number_of_ads)
+            number_of_headlines = int(number_of_headlines)
         except ValueError:
-            number_of_ads = 5
+            number_of_headlines = 5
+        try:
+            number_of_supplementary_copy = int(number_of_supplementary_copy)
+        except ValueError:
+            number_of_supplementary_copy = 5
 
         # Get persona if selected
         persona = None
@@ -565,7 +576,8 @@ def generator_edit(request, campaign_id, generator_id):
         generator.headlines = headlines
         generator.supplementary_copy = supplementary_copy
         generator.customer_persona = persona
-        generator.number_of_ads = number_of_ads
+        generator.number_of_headlines = number_of_headlines
+        generator.number_of_supplementary_copy = number_of_supplementary_copy
         generator.dimensions = dimensions
         generator.placement = placement
         generator.is_template = is_template
