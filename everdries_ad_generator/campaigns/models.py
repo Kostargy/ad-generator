@@ -125,11 +125,13 @@ class Generator(models.Model):
     STATUS_PROCESSING = "processing"
     STATUS_COMPLETED = "completed"
     STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Pending"),
         (STATUS_PROCESSING, "Processing"),
         (STATUS_COMPLETED, "Completed"),
         (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
     ]
 
     campaign = models.ForeignKey(
@@ -183,6 +185,9 @@ class Generator(models.Model):
     # Progress tracking — populated when a generation run starts.
     total_expected = models.PositiveIntegerField(default=0)
     started_at = models.DateTimeField(null=True, blank=True)
+    # ID of the most recently dispatched Celery task. Stored so the Stop
+    # button can revoke it. Cleared when a new run starts.
+    celery_task_id = models.CharField(max_length=255, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -401,6 +401,9 @@ def generator_create(request, campaign_id):
         generator.save(update_fields=["status"])
         result = generate_ads_task.delay(generator.id)
         print(f"[VIEW] generator_create: task dispatched with ID {result.id}")
+        # Remember the task ID so the Stop button can revoke it later.
+        generator.celery_task_id = result.id
+        generator.save(update_fields=["celery_task_id"])
 
         messages.success(request, f"Generator '{title}' created. Image generation started.")
         return redirect("campaigns:generator_list", campaign_id=campaign_id)
@@ -453,6 +456,9 @@ def generate_ads(request, campaign_id, generator_id):
     print(f"[VIEW] Dispatching Celery task for generator {generator.id}")
     result = generate_ads_task.delay(generator.id)
     print(f"[VIEW] Task dispatched: {result.id}")
+    # Remember the task ID so the Stop button can revoke it later.
+    generator.celery_task_id = result.id
+    generator.save(update_fields=["celery_task_id"])
 
     messages.success(request, f"Image generation started for '{generator.title}'. Check back shortly.")
     return redirect("campaigns:generator_list", campaign_id=campaign_id)
@@ -713,6 +719,35 @@ def generator_delete(request, campaign_id, generator_id):
     title = generator.title
     generator.delete()
     return JsonResponse({"status": "success", "message": f"Generator '{title}' deleted."})
+
+
+@login_required
+@require_POST
+def generator_cancel(request, campaign_id, generator_id):
+    """Hard-cancel a running generation: revoke the Celery task and mark the
+    generator as CANCELLED. Already-generated ads are kept; there is no
+    resume — the user can create a new generator if they need more.
+    """
+    from celery.result import AsyncResult
+
+    from config.celery_app import app as celery_app
+
+    campaign = get_object_or_404(Campaign, id=campaign_id, created_by=request.user)
+    generator = get_object_or_404(Generator, id=generator_id, campaign=campaign)
+
+    # Only running generators can be cancelled. If the task already finished
+    # (or never started), just mark the row and move on.
+    if generator.celery_task_id:
+        try:
+            AsyncResult(generator.celery_task_id, app=celery_app).revoke(terminate=True)
+        except Exception as e:  # pragma: no cover - defensive
+            print(f"[VIEW] generator_cancel: revoke failed for task {generator.celery_task_id}: {e}")
+
+    generator.status = Generator.STATUS_CANCELLED
+    generator.celery_task_id = ""
+    generator.save(update_fields=["status", "celery_task_id", "updated_at"])
+
+    return JsonResponse({"status": "success", "message": f"Generator '{generator.title}' stopped."})
 
 
 @login_required

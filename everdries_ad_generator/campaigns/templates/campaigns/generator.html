@@ -84,6 +84,8 @@
                 </div>
               {% elif generator.status == 'failed' %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>
+              {% elif generator.status == 'cancelled' %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Stopped</span>
               {% else %}
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Pending</span>
               {% endif %}
@@ -98,7 +100,17 @@
             <td class="py-4 px-4 text-sm text-gray-600 text-center" data-ads-count-cell>{{ generator.ads_count }}</td>
             <td class="py-4 px-4 text-right space-x-2"
                 data-actions-cell
-                data-restart-url="{% url 'campaigns:generate_ads' campaign.id generator.id %}">
+                data-restart-url="{% url 'campaigns:generate_ads' campaign.id generator.id %}"
+                data-cancel-url="{% url 'campaigns:generator_cancel' campaign.id generator.id %}">
+              {% if generator.status == 'processing' %}
+              <button type="button"
+                      data-cancel-generator
+                      data-cancel-url="{% url 'campaigns:generator_cancel' campaign.id generator.id %}"
+                      data-generator-title="{{ generator.title }}"
+                      class="px-3 py-1 bg-amber-500 text-white rounded-md text-sm hover:bg-amber-600 transition-colors inline-block">
+                Stop
+              </button>
+              {% endif %}
               {% if generator.status == 'failed' %}
               <form method="post" action="{% url 'campaigns:generate_ads' campaign.id generator.id %}" class="inline" data-restart-form>
                 {% csrf_token %}
@@ -226,6 +238,49 @@ document.querySelectorAll('[data-delete-generator]').forEach(btn => {
   btn.addEventListener('click', handleDeleteGeneratorClick);
 });
 
+// Stop a running generator: revoke the Celery task and mark CANCELLED.
+// Already-generated ads are kept. No resume.
+function handleCancelGeneratorClick(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  const btn = e.currentTarget;
+  const title = btn.getAttribute('data-generator-title') || 'this generator';
+  if (!confirm(`Stop "${title}"? Already-generated ads will be kept, but no more will be produced. This cannot be resumed.`)) {
+    return;
+  }
+  const url = btn.getAttribute('data-cancel-url');
+  btn.disabled = true;
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'Accept': 'application/json',
+    },
+  })
+    .then(r => {
+      if (!r.ok) throw new Error('Stop failed');
+      return r.json();
+    })
+    .then(() => {
+      // Optimistic UI update — the next poll will confirm.
+      const row = btn.closest('tr[data-generator-id]');
+      const statusCell = row?.querySelector('[data-status-cell]');
+      if (statusCell) {
+        statusCell.innerHTML = getStatusBadgeHTML({ status: 'cancelled' });
+      }
+      btn.remove();
+    })
+    .catch(err => {
+      console.error('Failed to stop generator:', err);
+      alert('Failed to stop generator. Please try again.');
+      btn.disabled = false;
+    });
+}
+
+document.querySelectorAll('[data-cancel-generator]').forEach(btn => {
+  btn.addEventListener('click', handleCancelGeneratorClick);
+});
+
 // Adaptive polling: 5s while any row is processing, 60s otherwise.
 function schedulePoll() {
   const anyProcessing = !!document.querySelector('[data-progress]');
@@ -297,6 +352,23 @@ function updateGeneratorRow(generator) {
     } else if (generator.status !== 'failed' && existing) {
       existing.remove();
     }
+
+    // Stop button: visible only while processing.
+    const existingStop = actionsCell.querySelector('[data-cancel-generator]');
+    if (generator.status === 'processing' && !existingStop) {
+      const url = actionsCell.getAttribute('data-cancel-url');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'px-3 py-1 bg-amber-500 text-white rounded-md text-sm hover:bg-amber-600 transition-colors inline-block';
+      btn.setAttribute('data-cancel-generator', '');
+      btn.setAttribute('data-cancel-url', url);
+      btn.setAttribute('data-generator-title', row.querySelector('td:nth-child(2)')?.textContent?.trim() || '');
+      btn.textContent = 'Stop';
+      btn.addEventListener('click', handleCancelGeneratorClick);
+      actionsCell.prepend(btn);
+    } else if (generator.status !== 'processing' && existingStop) {
+      existingStop.remove();
+    }
   }
 }
 
@@ -319,6 +391,8 @@ function getStatusBadgeHTML(generator) {
       </div>`;
     case 'failed':
       return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>';
+    case 'cancelled':
+      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Stopped</span>';
     default:
       return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Pending</span>';
   }

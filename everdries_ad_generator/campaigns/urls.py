@@ -28,6 +28,7 @@ urlpatterns = [
     path("products/<int:campaign_id>/generators/<int:generator_id>/edit/", views.generator_edit, name="generator_edit"),
     path("products/<int:campaign_id>/generators/<int:generator_id>/generate/", views.generate_ads, name="generate_ads"),
     path("products/<int:campaign_id>/generators/<int:generator_id>/delete/", views.generator_delete, name="generator_delete"),
+    path("products/<int:campaign_id>/generators/<int:generator_id>/cancel/", views.generator_cancel, name="generator_cancel"),
     path("products/<int:campaign_id>/generate-headlines/", views.generate_headlines, name="generate_headlines"),
     path("products/<int:campaign_id>/generate-supplementary-copy/", views.generate_supplementary_copy, name="generate_supplementary_copy"),
 
