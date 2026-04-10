@@ -276,6 +276,12 @@ class APISettings(models.Model):
         ("gemini-2.5-pro", "Gemini 2.5 Pro (Higher quality)"),
     ]
 
+    ANTHROPIC_MODEL_CHOICES = [
+        ("claude-haiku-4-5-20251001", "Claude Haiku 4.5 (Fast, recommended for headlines)"),
+        ("claude-sonnet-4-6", "Claude Sonnet 4.6 (Balanced)"),
+        ("claude-opus-4-6", "Claude Opus 4.6 (Highest quality)"),
+    ]
+
     primary_provider = models.CharField(
         max_length=20,
         choices=PROVIDER_CHOICES,
@@ -284,6 +290,13 @@ class APISettings(models.Model):
     )
     gemini_api_key = models.CharField(max_length=255, blank=True)
     openai_api_key = models.CharField(max_length=255, blank=True)
+    anthropic_api_key = models.CharField(max_length=255, blank=True)
+    headline_anthropic_model = models.CharField(
+        max_length=100,
+        choices=ANTHROPIC_MODEL_CHOICES,
+        default="claude-haiku-4-5-20251001",
+        help_text="Claude model used to generate headlines and supplementary copy",
+    )
     gemini_model = models.CharField(
         max_length=100,
         choices=GEMINI_MODEL_CHOICES,

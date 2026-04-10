@@ -742,8 +742,10 @@ def settings_view(request):
         primary_provider = request.POST.get("primary_provider", "").strip()
         gemini_key = request.POST.get("gemini_api_key", "").strip()
         openai_key = request.POST.get("openai_api_key", "").strip()
+        anthropic_key = request.POST.get("anthropic_api_key", "").strip()
         gemini_model = request.POST.get("gemini_model", "").strip()
         critic_model = request.POST.get("critic_model", "").strip()
+        headline_anthropic_model = request.POST.get("headline_anthropic_model", "").strip()
         critic_max_retries = request.POST.get("critic_max_retries", "").strip()
         master_prompt = request.POST.get("master_prompt", "").strip()
 
@@ -751,10 +753,13 @@ def settings_view(request):
             api_settings.primary_provider = primary_provider
         api_settings.gemini_api_key = gemini_key
         api_settings.openai_api_key = openai_key
+        api_settings.anthropic_api_key = anthropic_key
         if gemini_model:
             api_settings.gemini_model = gemini_model
         if critic_model:
             api_settings.critic_model = critic_model
+        if headline_anthropic_model:
+            api_settings.headline_anthropic_model = headline_anthropic_model
         if critic_max_retries:
             try:
                 api_settings.critic_max_retries = max(0, min(10, int(critic_max_retries)))
@@ -772,6 +777,7 @@ def settings_view(request):
         "provider_choices": APISettings.PROVIDER_CHOICES,
         "gemini_model_choices": APISettings.GEMINI_MODEL_CHOICES,
         "critic_model_choices": APISettings.CRITIC_MODEL_CHOICES,
+        "anthropic_model_choices": APISettings.ANTHROPIC_MODEL_CHOICES,
         "default_master_prompt": APISettings.DEFAULT_MASTER_PROMPT,
     }
     return render(request, "campaigns/settings.html", context)

@@ -1,9 +1,9 @@
 """
 Headline and supplementary-copy generation service.
 
-Uses Gemini/OpenAI to generate ad headlines and supporting feature/benefit
-copy based on product and campaign data. Supports fallback between providers
-based on settings.
+Uses Anthropic Claude to generate ad headlines and supporting feature/benefit
+copy based on product and campaign data. The specific Claude model is
+configured in APISettings.
 """
 
 from __future__ import annotations
@@ -18,11 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class HeadlineGenerator:
-    """Generates ad headlines using Gemini or OpenAI with fallback support."""
+    """Generates ad headlines using Anthropic Claude."""
 
-    SYSTEM_PROMPT = """# Ad Headline Generator
-
-You are an expert advertising copywriter for {product_name}.
+    SYSTEM_PROMPT = """You are an expert advertising copywriter for {product_name}.
 
 ## Target Persona
 {persona_description}
@@ -36,115 +34,94 @@ You are an expert advertising copywriter for {product_name}.
 ## Brand Guidelines
 {master_prompt}
 
-## Instructions
-- Generate exactly {number_of_headlines} headline variations
-- Keep headlines short: 3-8 words ideal, 12 words max
-- Lead with benefit or outcome, not feature
-- Each headline should work standalone on an ad image
-- Include variety: benefit-first, lifestyle, urgency, social proof angles
+## Number of Headlines
+{number_of_headlines}
 
-Output ONLY the headlines, one per line. No numbering, no bullet points, no explanations."""
+Output ONLY the headlines and nothing else."""
 
     def __init__(self) -> None:
-        self._gemini_client: Any | None = None
-        self._openai_client: Any | None = None
+        self._anthropic_client: Any | None = None
+        self._anthropic_api_key: str = ""
+        self._anthropic_model: str = "claude-haiku-4-5-20251001"
         self._master_prompt: str = ""
-        self._primary_provider: str = "gemini"
-        self._gemini_api_key: str = ""
-        self._openai_api_key: str = ""
         self.max_retries = 3
         self.retry_delay_seconds = 2.0
 
     def _load_settings(self) -> None:
-        """Load API keys and settings from database."""
+        """Load API key, model, and master prompt from database."""
         try:
             from everdries_ad_generator.campaigns.models import APISettings
             api_settings = APISettings.get_settings()
 
-            self._gemini_api_key = api_settings.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
-            self._openai_api_key = api_settings.openai_api_key or os.environ.get("OPENAI_API_KEY", "")
+            self._anthropic_api_key = (
+                api_settings.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+            )
+            self._anthropic_model = (
+                api_settings.headline_anthropic_model or "claude-haiku-4-5-20251001"
+            )
             self._master_prompt = api_settings.master_prompt or APISettings.DEFAULT_MASTER_PROMPT
-            self._primary_provider = api_settings.primary_provider or "gemini"
             self.max_retries = api_settings.critic_max_retries  # Reuse retry setting
         except Exception as e:
             logger.warning("Could not load API settings: %s", e)
-            self._gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
-            self._openai_api_key = os.environ.get("OPENAI_API_KEY", "")
+            self._anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
-    def _get_gemini_client(self) -> Any | None:
-        """Get or create Gemini client."""
-        if self._gemini_client is None and self._gemini_api_key:
+    def _get_anthropic_client(self) -> Any | None:
+        """Get or create Anthropic client."""
+        if self._anthropic_client is None and self._anthropic_api_key:
             try:
-                from google import genai
-                self._gemini_client = genai.Client(api_key=self._gemini_api_key)
+                import anthropic
+                self._anthropic_client = anthropic.Anthropic(api_key=self._anthropic_api_key)
             except Exception as e:
-                logger.error("Failed to initialize Gemini client: %s", e)
-        return self._gemini_client
+                logger.error("Failed to initialize Anthropic client: %s", e)
+        return self._anthropic_client
 
-    def _get_openai_client(self) -> Any | None:
-        """Get or create OpenAI client."""
-        if self._openai_client is None and self._openai_api_key:
-            try:
-                from openai import OpenAI
-                self._openai_client = OpenAI(api_key=self._openai_api_key)
-            except Exception as e:
-                logger.error("Failed to initialize OpenAI client: %s", e)
-        return self._openai_client
+    def _generate_with_anthropic(self, prompt: str) -> str:
+        """Generate text using Anthropic Claude with retry logic."""
+        import anthropic
 
-    def _generate_with_gemini(self, prompt: str) -> str:
-        """Generate headlines using Gemini with retry logic."""
-        from google.genai import types
-
-        client = self._get_gemini_client()
+        client = self._get_anthropic_client()
         if client is None:
-            raise RuntimeError("Gemini client not available")
+            raise RuntimeError("Anthropic client not available")
 
-        last_error = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[prompt],
-                    config=types.GenerateContentConfig(
-                        temperature=0.9,
-                    ),
+                msg = client.messages.create(
+                    model=self._anthropic_model,
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}],
                 )
-                return response.text.strip()
+                # content is a list of content blocks; first block is text for our prompts.
+                if not msg.content:
+                    raise RuntimeError("Anthropic returned empty content")
+                text = getattr(msg.content[0], "text", "") or ""
+                return text.strip()
+            except anthropic.RateLimitError as e:
+                last_error = e
+                transient = True
+            except anthropic.APIConnectionError as e:
+                last_error = e
+                transient = True
+            except anthropic.APIStatusError as e:
+                last_error = e
+                transient = getattr(e, "status_code", None) in {429, 500, 502, 503, 529}
             except Exception as e:
                 last_error = e
-                error_str = str(e)
+                transient = False
 
-                # Retry on rate limit or transient errors
-                if ("429" in error_str or "503" in error_str or "overloaded" in error_str.lower()) and attempt < self.max_retries:
-                    wait = self.retry_delay_seconds * (2 ** attempt)
-                    logger.warning(
-                        "Gemini rate limited/unavailable, retrying in %ds (attempt %d/%d): %s",
-                        wait, attempt + 1, self.max_retries, e
-                    )
-                    time.sleep(wait)
-                else:
-                    break
+            if transient and attempt < self.max_retries:
+                wait = self.retry_delay_seconds * (2 ** attempt)
+                logger.warning(
+                    "Anthropic transient error, retrying in %ds (attempt %d/%d): %s",
+                    wait, attempt + 1, self.max_retries, last_error,
+                )
+                time.sleep(wait)
+                continue
+            break
 
-        raise RuntimeError(f"Gemini generation failed after {self.max_retries + 1} attempts: {last_error}")
-
-    def _generate_with_openai(self, prompt: str) -> str:
-        """Generate headlines using OpenAI."""
-        client = self._get_openai_client()
-        if client is None:
-            raise RuntimeError("OpenAI client not available")
-
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are an expert advertising copywriter."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.9,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            raise RuntimeError(f"OpenAI generation failed: {e}")
+        raise RuntimeError(
+            f"Anthropic generation failed after {self.max_retries + 1} attempts: {last_error}"
+        )
 
     @staticmethod
     def _sanitize_output(raw: str, count: int) -> str:
@@ -168,6 +145,17 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
                 line,
                 flags=re.IGNORECASE,
             )
+            # Strip leading markdown heading markers ("# ", "## ", etc.).
+            line = re.sub(r"^#+\s*", "", line)
+            # Strip inline markdown: links, bold, italic, code, strikethrough.
+            # Order matters: handle **bold** before *italic* so bold doesn't half-strip.
+            line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", line)
+            line = re.sub(r"\*\*([^*]+)\*\*", r"\1", line)
+            line = re.sub(r"__([^_]+)__", r"\1", line)
+            line = re.sub(r"\*([^*]+)\*", r"\1", line)
+            line = re.sub(r"_([^_]+)_", r"\1", line)
+            line = re.sub(r"`([^`]+)`", r"\1", line)
+            line = re.sub(r"~~([^~]+)~~", r"\1", line)
             # Strip a single pair of wrapping quotes.
             if len(line) >= 2 and line[0] in {'"', "'", "“", "‘"} and line[-1] in {'"', "'", "”", "’"}:
                 line = line[1:-1].strip()
@@ -185,7 +173,7 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
         brief: str,
         count: int = 5,
     ) -> str:
-        """Generate headlines using configured provider with fallback.
+        """Generate headlines using Anthropic Claude.
 
         Args:
             product_name: Name of the product/campaign.
@@ -195,17 +183,15 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
             count: Number of headlines to generate.
 
         Returns:
-            String with headlines, one per line.
+            String with headlines, one per line, or an "Error: ..." string
+            on failure.
         """
-        # Load settings
         self._load_settings()
 
-        # Check if any API key is available
-        if not self._gemini_api_key and not self._openai_api_key:
-            logger.error("No API keys configured for headline generation")
-            return "Error: No API keys configured. Please add Gemini or OpenAI API key in Settings."
+        if not self._anthropic_api_key:
+            logger.error("No Anthropic API key configured for headline generation")
+            return "Error: No Anthropic API key configured. Please add it in Settings."
 
-        # Build prompt
         prompt = self.SYSTEM_PROMPT.format(
             product_name=product_name or "the product",
             product_context=product_context or "No additional context provided.",
@@ -215,60 +201,24 @@ Output ONLY the headlines, one per line. No numbering, no bullet points, no expl
             number_of_headlines=count,
         )
 
-        # Determine provider order based on settings
-        if self._primary_provider in ("openai", "openai_only"):
-            providers = [("openai", self._generate_with_openai)]
-            if self._primary_provider == "openai" and self._gemini_api_key:
-                providers.append(("gemini", self._generate_with_gemini))
-        else:
-            # Default: Gemini first
-            providers = [("gemini", self._generate_with_gemini)]
-            if self._primary_provider == "gemini" and self._openai_api_key:
-                providers.append(("openai", self._generate_with_openai))
-
-        # Filter to only providers with API keys
-        providers = [
-            (name, func) for name, func in providers
-            if (name == "gemini" and self._gemini_api_key) or (name == "openai" and self._openai_api_key)
-        ]
-
-        if not providers:
-            return "Error: No valid API keys for configured providers."
-
-        # Try each provider
-        errors = []
-        for provider_name, generate_func in providers:
-            try:
-                logger.info("Generating headlines with %s", provider_name)
-                result = generate_func(prompt)
-                logger.info("Headlines generated successfully with %s", provider_name)
-                return self._sanitize_output(result, count)
-            except Exception as e:
-                error_msg = f"{provider_name}: {e}"
-                errors.append(error_msg)
-                logger.warning("Headline generation failed with %s: %s", provider_name, e)
-
-                # If there's a fallback, continue to next provider
-                if len(providers) > 1:
-                    logger.info("Falling back to next provider...")
-                continue
-
-        # All providers failed
-        error_summary = "; ".join(errors)
-        logger.error("All providers failed for headline generation: %s", error_summary)
-        return f"Error: All providers failed. {error_summary}"
+        try:
+            logger.info("Generating headlines with Anthropic %s", self._anthropic_model)
+            result = self._generate_with_anthropic(prompt)
+            logger.info("Headlines generated successfully")
+            return self._sanitize_output(result, count)
+        except Exception as e:
+            logger.error("Headline generation failed: %s", e)
+            return f"Error: {e}"
 
 
 class SupplementaryCopyGenerator(HeadlineGenerator):
     """Generates short feature/benefit callout lines that sit alongside the headline.
 
-    Reuses HeadlineGenerator's provider/fallback/sanitizer plumbing — only the
-    system prompt and the public method name differ.
+    Reuses HeadlineGenerator's Anthropic client and sanitizer plumbing — only
+    the system prompt and the public method signature differ.
     """
 
-    SYSTEM_PROMPT = """# Ad Supplementary Copy Generator
-
-You are an expert advertising copywriter for {product_name}.
+    SYSTEM_PROMPT = """You are an expert advertising copywriter for {product_name}.
 
 ## Target Persona
 {persona_description}
@@ -285,18 +235,10 @@ You are an expert advertising copywriter for {product_name}.
 ## Existing Headlines (for tone reference — do NOT repeat these)
 {headlines}
 
-## Instructions
-- Generate exactly {number_of_lines} short supplementary copy lines.
-- These are FEATURE CALLOUTS / BENEFIT LINES that sit alongside a headline on
-  an ad image — things like "Leak-proof for 12 hours", "Machine washable",
-  "Free shipping", "30-day guarantee".
-- Keep each line VERY short: 2-6 words ideal, 8 words max. They must fit on
-  an ad as small supporting text.
-- Each line stands alone — no connectors, no punctuation between lines.
-- Variety: mix concrete features, benefits, social proof, and reassurance.
-- Do NOT repeat or paraphrase any of the existing headlines above.
+## Number of Lines
+{number_of_lines}
 
-Output ONLY the lines, one per line. No numbering, no bullet points, no explanations."""
+Output ONLY the supplementary copy lines and nothing else."""
 
     def generate(  # type: ignore[override]
         self,
@@ -307,12 +249,12 @@ Output ONLY the lines, one per line. No numbering, no bullet points, no explanat
         headlines: str = "",
         count: int = 5,
     ) -> str:
-        """Generate supplementary copy lines using configured provider with fallback."""
+        """Generate supplementary copy lines using Anthropic Claude."""
         self._load_settings()
 
-        if not self._gemini_api_key and not self._openai_api_key:
-            logger.error("No API keys configured for supplementary copy generation")
-            return "Error: No API keys configured. Please add Gemini or OpenAI API key in Settings."
+        if not self._anthropic_api_key:
+            logger.error("No Anthropic API key configured for supplementary copy generation")
+            return "Error: No Anthropic API key configured. Please add it in Settings."
 
         prompt = self.SYSTEM_PROMPT.format(
             product_name=product_name or "the product",
@@ -324,37 +266,11 @@ Output ONLY the lines, one per line. No numbering, no bullet points, no explanat
             number_of_lines=count,
         )
 
-        if self._primary_provider in ("openai", "openai_only"):
-            providers = [("openai", self._generate_with_openai)]
-            if self._primary_provider == "openai" and self._gemini_api_key:
-                providers.append(("gemini", self._generate_with_gemini))
-        else:
-            providers = [("gemini", self._generate_with_gemini)]
-            if self._primary_provider == "gemini" and self._openai_api_key:
-                providers.append(("openai", self._generate_with_openai))
-
-        providers = [
-            (name, func) for name, func in providers
-            if (name == "gemini" and self._gemini_api_key) or (name == "openai" and self._openai_api_key)
-        ]
-
-        if not providers:
-            return "Error: No valid API keys for configured providers."
-
-        errors = []
-        for provider_name, generate_func in providers:
-            try:
-                logger.info("Generating supplementary copy with %s", provider_name)
-                result = generate_func(prompt)
-                logger.info("Supplementary copy generated successfully with %s", provider_name)
-                return self._sanitize_output(result, count)
-            except Exception as e:
-                errors.append(f"{provider_name}: {e}")
-                logger.warning("Supplementary copy generation failed with %s: %s", provider_name, e)
-                if len(providers) > 1:
-                    logger.info("Falling back to next provider...")
-                continue
-
-        error_summary = "; ".join(errors)
-        logger.error("All providers failed for supplementary copy generation: %s", error_summary)
-        return f"Error: All providers failed. {error_summary}"
+        try:
+            logger.info("Generating supplementary copy with Anthropic %s", self._anthropic_model)
+            result = self._generate_with_anthropic(prompt)
+            logger.info("Supplementary copy generated successfully")
+            return self._sanitize_output(result, count)
+        except Exception as e:
+            logger.error("Supplementary copy generation failed: %s", e)
+            return f"Error: {e}"
