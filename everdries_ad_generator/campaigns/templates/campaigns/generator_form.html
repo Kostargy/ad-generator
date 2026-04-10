@@ -223,6 +223,17 @@
       </div>
       {% endif %}
 
+      <!-- Calculated Ad Count -->
+      <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-md">
+        <div class="text-sm text-gray-700">
+          <span class="font-medium">Total ads to generate:</span>
+          <span id="ad-count-formula" class="text-gray-600 ml-1">—</span>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          Calculated as headlines × style references × model images. Flat-lay images don't multiply — they're attached to every ad as supporting reference photos.
+        </p>
+      </div>
+
       <!-- Form Actions -->
       <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
         <a href="{% url 'campaigns:generator_list' campaign.id %}"
@@ -408,6 +419,51 @@
     }
   }
 
+  // Live ad count: headlines × max(1, style_refs) × max(1, model_refs).
+  // Mirrors image_gen_adapter.get_estimated_count(). Flat-lays are NOT a
+  // fan-out dimension — they're attached to every cell as supporting refs.
+  function recalculateAdCount() {
+    const display = document.getElementById('ad-count-formula');
+    if (!display) return;
+    const headlinesEl = document.getElementById('headlines');
+    const headlineCount = (headlinesEl?.value || '')
+      .split('\n')
+      .filter(l => l.trim())
+      .length;
+    const styleCount = document.querySelectorAll('input[name="style_references"]:checked').length;
+    const modelCount = document.querySelectorAll('input[name="model_references"]:checked').length;
+    const flatLayCount = document.querySelectorAll('input[name="flat_lay_references"]:checked').length;
+    const effStyles = Math.max(1, styleCount);
+    const effModels = Math.max(1, modelCount);
+    const total = headlineCount * effStyles * effModels;
+
+    if (headlineCount === 0) {
+      display.textContent = 'Add at least one headline to see the count';
+      return;
+    }
+    const styleLabel = `${effStyles} style ref${effStyles !== 1 ? 's' : ''}` +
+      (styleCount === 0 ? ' (none, defaults to 1)' : '');
+    const modelLabel = `${effModels} model image${effModels !== 1 ? 's' : ''}` +
+      (modelCount === 0 ? ' (none, defaults to 1)' : '');
+    let formula =
+      `${headlineCount} headline${headlineCount !== 1 ? 's' : ''} × ${styleLabel} × ${modelLabel} = ${total} ad${total !== 1 ? 's' : ''}`;
+    if (flatLayCount > 0) {
+      formula += ` (each carrying ${flatLayCount} flat-lay${flatLayCount !== 1 ? 's' : ''} as reference)`;
+    }
+    display.textContent = formula;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('headlines')?.addEventListener('input', recalculateAdCount);
+    document.querySelectorAll(
+      'input[name="style_references"], input[name="model_references"], input[name="flat_lay_references"]'
+    ).forEach(el => el.addEventListener('change', recalculateAdCount));
+    recalculateAdCount();
+  });
+
+  // Re-run after the upload modal injects new checkboxes via addAssetCheckbox.
+  // We hook into addAssetCheckbox by wrapping it after definition, below.
+
   // Asset Modal Functions
   let currentAssetType = '';
 
@@ -566,6 +622,11 @@
         <span class="text-sm text-gray-700 truncate">${asset.name}</span>
       `;
       grid.appendChild(label);
+      // Wire the new checkbox into the live ad-count calculator and recalc
+      // once (the new box starts checked, so the count should bump up).
+      label.querySelector('input[type="checkbox"]')
+        .addEventListener('change', recalculateAdCount);
+      recalculateAdCount();
     }
   }
 
