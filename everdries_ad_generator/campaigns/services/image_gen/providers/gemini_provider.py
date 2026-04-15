@@ -145,9 +145,17 @@ class GeminiProvider(ImageProvider):
                 if img.mode not in ("RGB", "RGBA"):
                     img = img.convert("RGB")
                 contents.append(
-                    "LAYOUT REFERENCE — follow this ad's layout structure, "
-                    "text placement, and typography style. Do NOT use any "
-                    "person, product, colors, or text content from this image:"
+                    "STYLE REFERENCE TEMPLATE — treat this as a template. "
+                    "Replicate its layout, text placement, typography, and any "
+                    "supporting text elements it contains (CTAs, buttons, "
+                    "prices, badges, taglines) transcribed EXACTLY as shown, "
+                    "in the same position, EXACTLY ONCE. Do NOT duplicate any "
+                    "element — each CTA/button/badge/price appears in the "
+                    "final ad exactly once. Do NOT copy the person or product "
+                    "from this image (those come from the reference photos). "
+                    "Do NOT copy the background color or any panels from this "
+                    "image (the background comes from the model photo, per "
+                    "BACKGROUND INTEGRATION rules):"
                 )
                 contents.append(img)
             except Exception as e:

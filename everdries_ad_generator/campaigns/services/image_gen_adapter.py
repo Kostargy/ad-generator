@@ -63,6 +63,17 @@ When multiple reference images are attached, treat them as follows:
 - MODEL PHOTO (a person wearing or holding the product): use this exact photo as-is as the hero of the ad. Do NOT redraw the model, the pose, the clothing, or the background of this photo — composite design elements around and on top of it.
 - FLATLAY / GHOST-MANNEQUIN PHOTO (product shown alone, possibly in multiple colors): use as an accurate reference for product detail, color, and texture. Do NOT redraw. You may include a flatlay as a secondary design element (e.g. a small color strip or sidebar), but never as the hero unless no model photo is provided.
 
+BACKGROUND INTEGRATION (HIGHEST PRIORITY — overrides the STYLE REFERENCE):
+The ENTIRE ad canvas, from edge to edge, uses the model photo's backdrop as its background. Extend / outpaint the model photo's existing backdrop so it fills the full canvas — the model photo is not a framed element sitting inside the ad, it IS the ad's background. All text, graphics, and design elements are composited DIRECTLY ON TOP of this extended backdrop.
+
+Hard prohibitions (these override anything implied by the STYLE REFERENCE):
+- NO white panel, off-white panel, cream panel, colored sidebar, or split-screen layout. The canvas has ONE continuous background, not two.
+- NO vertical or horizontal divider, seam, border, frame, gradient edge, or hard color transition between the area containing the model and the area containing the text.
+- NO rectangular block, card, pill, or shape of a different color placed behind the headline or supplementary copy. The headline sits directly on the extended backdrop — if contrast is needed for legibility, use a soft drop shadow, outline, or subtle darkening of the backdrop immediately behind the letters, NEVER a separate colored panel.
+- NO secondary background color anywhere in the composition. Sample the dominant color of the model photo's backdrop and use that exact color for every pixel of negative space.
+
+Interaction with the STYLE REFERENCE (below): the style reference determines WHERE text and graphical elements are placed (layout positions, typography, proportions, spacing) and WHICH supporting elements exist (CTAs, badges, prices — see STYLE REFERENCE rules). It does NOT determine background colors, panel colors, or split-screen structure. If the style reference shows a white right-hand panel with text on it, you place the text in that same position but on the extended model-photo backdrop — NOT on a white panel.
+
 STYLE REFERENCE (when one is attached):
 Treat the style reference as a TEMPLATE. Replicate its layout structure, text placement, typography style, color palette, composition, AND any supporting text elements it contains — CTAs, prices, badges, taglines, disclaimers, supporting copy — transcribed EXACTLY as they appear in the style reference, in the same position and style. Replacements are made ONLY where the style reference has an equivalent slot:
 1. If the style reference has a main headline slot, replace its headline text with the HEADLINE specified elsewhere in this prompt. If it has no headline slot, do not add one.
@@ -71,7 +82,8 @@ The product and model must come from the separate reference photos, NOT from the
 
 TEXT CONTENT RULES (STRICT):
 - The HEADLINE (and SUPPLEMENTARY COPY, if provided) specified elsewhere in this prompt must be rendered exactly as written wherever it is rendered. Spell every word exactly — do not paraphrase, do not auto-correct, do not add punctuation that isn't there. Render exactly ONE headline, never multiple or alternate versions.
-- If a STYLE REFERENCE is attached: whether HEADLINE and SUPPLEMENTARY COPY appear in the image is determined by whether the style reference has corresponding slots (see STYLE REFERENCE rules above). Additional text elements (CTAs, prices, badges, taglines, disclaimers) come from the style reference and must be transcribed exactly as they appear there. Do NOT invent copy beyond what the style reference shows, and do NOT drop copy the style reference shows.
+- EACH SUPPORTING ELEMENT APPEARS EXACTLY ONCE. No element — no CTA, no "Shop Now" button, no "Buy Now" button, no price, no badge, no tagline, no disclaimer, no brand mark — may be drawn, rendered, or composited more than once in the final image. If the style reference has one "BUY NOW" button, the final ad has exactly one "BUY NOW" button in the same position. If it has one price, the final ad has exactly one price. Never duplicate, never mirror, never add a second copy in another position.
+- If a STYLE REFERENCE is attached: whether HEADLINE and SUPPLEMENTARY COPY appear in the image is determined by whether the style reference has corresponding slots (see STYLE REFERENCE rules above). Additional text elements (CTAs, prices, badges, taglines, disclaimers) come from the style reference and must be transcribed exactly as they appear there — once each, in the same position the style reference shows them. Do NOT invent copy beyond what the style reference shows, and do NOT drop copy the style reference shows.
 - If NO style reference is attached: the ONLY text in the image is the HEADLINE (and SUPPLEMENTARY COPY, if provided). Do NOT add any other text — no prices, no CTAs ("Shop Now", "Buy", "Order Today"), no extra taglines, no promo badges, no brand name, no website, no hashtags, no disclaimers, no subtitles, no legal text.
 
 BRAND LOGO (when one is attached):
@@ -80,17 +92,14 @@ Reproduce the provided logo image exactly as supplied. Do NOT re-type, re-draw, 
 BRAND:
 Do NOT reference Trustpilot, reviews, or star ratings. Do NOT use "premium", "luxury", or similar upmarket language. Do NOT include any logo, brand mark, or wordmark unless a logo image has been explicitly attached as a reference.
 
-BACKGROUND INTEGRATION (CRITICAL):
-The ad background MUST match the model photo's existing background. Sample the dominant color and tone of the model photo's backdrop and use that SAME color as the background for the entire ad canvas, including any side panels, text areas, or negative space where copy lives. Do NOT introduce a second background color, a white or off-white panel, a split-screen layout, or a contrasting block behind the text — the text must sit on the same continuous background that surrounds the model. There must be NO visible vertical or horizontal seam, gradient edge, or hard boundary between the model photo's backdrop and the rest of the ad. The finished ad should look like one continuous scene where the headline and supporting graphics are composited directly over an extended version of the model photo's backdrop.
-This rule overrides any conflicting background or panel treatment implied by the STYLE REFERENCE. Replicate the style reference's layout and typography, but recolor its background panels to match the model photo.
-
 QUALITY CHECK BEFORE RETURNING:
 1. Is every letter of the headline spelled exactly as written in this prompt?
 2. Have you added any text beyond what the TEXT CONTENT RULES allow? If yes, remove it.
 3. Have you redrawn, recolored, or reinterpreted any product? If yes, replace it with the original reference photo.
 4. Does the style reference's person or product appear anywhere in the final image? If yes, replace it with the reference photos. (Style reference text elements like CTAs/prices/badges SHOULD be preserved — only the person and product are replaced.)
-5. Is the ad background one continuous color matching the model photo's backdrop, with NO white/off-white panels, split-screens, or visible seams behind the text? If there is a seam or a second background color, recolor the panels to match the model photo's backdrop.
+5. Does the model photo's backdrop extend edge-to-edge across the ENTIRE canvas, with the text composited directly on top of it? If there is ANY white/off-white/cream panel, colored sidebar, split-screen, vertical or horizontal seam, or rectangular shape of a different color behind the text — remove it and extend the model photo's backdrop to cover that area. The canvas must have ONE continuous background.
 6. Does the image contain SUPPLEMENTARY COPY that the style reference did not have a slot for? If so, remove it — supplementary copy is only rendered when the style reference already has a sub-copy slot.
+7. Does any supporting element appear more than once? Count the CTAs/buttons (e.g. "BUY NOW", "SHOP NOW"), prices, badges, taglines, and disclaimers. If any of them appear twice or more, delete the duplicates — each supporting element must appear exactly once, in the position shown in the style reference.
 
 Generate a high-quality advertisement image.
 """.strip()
@@ -197,7 +206,10 @@ class ImageGenAdapter:
         for headline in cfg.headlines:
             for style_idx, style_path in enumerate(style_refs):
                 for model_idx, model_path in enumerate(model_refs):
-                    prompt_text = self._format_prompt(headline=headline)
+                    prompt_text = self._format_prompt(
+                        headline=headline,
+                        has_style_ref=style_path is not None,
+                    )
 
                     # Build a name that distinguishes each cell in the fan-out
                     # so Ad rows are identifiable in the UI.
@@ -239,7 +251,7 @@ class ImageGenAdapter:
         except Exception:
             return ""
 
-    def _format_prompt(self, headline: str) -> str:
+    def _format_prompt(self, headline: str, has_style_ref: bool = False) -> str:
         """Build the prompt text for image generation."""
         cfg = self.config
         parts = []
@@ -265,28 +277,52 @@ class ImageGenAdapter:
             f'do NOT add any second headline or alternate version):\n"{headline}"'
         )
 
-        # Optional supplementary copy — feature callouts / benefit lines that
-        # render in smaller supporting type alongside the headline. Handles
-        # both shapes: a single tagline OR a multi-line bulleted list.
+        # Optional supplementary copy — feature callouts / benefit lines.
+        # Placement rules differ depending on whether a STYLE REFERENCE is
+        # attached: with a style ref, the copy is slot-gated (only rendered
+        # if the style ref already has a sub-copy area); without one, it
+        # renders freely around or beneath the headline.
         supp = cfg.supplementary_copy
         has_supp = bool(supp)
         if has_supp:
             if len(supp) == 1:
+                supp_payload = f'"{supp[0]}"'
+            else:
+                supp_payload = "\n".join(f'- "{line}"' for line in supp)
+
+            if has_style_ref:
                 supp_block = (
-                    f'\nSUPPLEMENTARY COPY (render exactly as written, in '
-                    f'smaller supporting type around or beneath the headline '
-                    f'— do NOT paraphrase, do NOT add other lines):\n'
-                    f'"{supp[0]}"'
+                    "\nSUPPLEMENTARY COPY (CANDIDATE SUB-COPY ONLY — do NOT "
+                    "render this anywhere unless the style reference already "
+                    "has a sub-copy / descriptive body slot. If the style "
+                    "reference has a sub-copy slot, replace the style "
+                    "reference's sub-copy text with the lines below, "
+                    "transcribed exactly as written. If the style reference "
+                    "has NO sub-copy slot, OMIT these lines entirely — do "
+                    "NOT render them anywhere in the image, do NOT create "
+                    "a new sub-copy area, do NOT add them as bullets, "
+                    "callouts, badges, or captions, and do NOT place them "
+                    "around or beneath the headline):\n"
+                    f"{supp_payload}"
                 )
             else:
-                bullet_lines = "\n".join(f'- "{line}"' for line in supp)
-                supp_block = (
-                    "\nSUPPLEMENTARY COPY (render each of the following lines "
-                    "exactly as written, as small supporting callouts/bullets "
-                    "around or beneath the headline — do NOT paraphrase, do "
-                    "NOT merge them, do NOT add other lines):\n"
-                    f"{bullet_lines}"
-                )
+                if len(supp) == 1:
+                    supp_block = (
+                        "\nSUPPLEMENTARY COPY (render exactly as written, in "
+                        "smaller supporting type around or beneath the "
+                        "headline — do NOT paraphrase, do NOT add other "
+                        "lines):\n"
+                        f"{supp_payload}"
+                    )
+                else:
+                    supp_block = (
+                        "\nSUPPLEMENTARY COPY (render each of the following "
+                        "lines exactly as written, as small supporting "
+                        "callouts/bullets around or beneath the headline — "
+                        "do NOT paraphrase, do NOT merge them, do NOT add "
+                        "other lines):\n"
+                        f"{supp_payload}"
+                    )
             parts.append(supp_block)
 
         # Brief/additional creative direction.
