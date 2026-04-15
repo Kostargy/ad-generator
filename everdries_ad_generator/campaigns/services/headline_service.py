@@ -17,6 +17,60 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+UNIVERSAL_COPY_RULES = """VOICE & TONE
+- Third person or imperative only — never first person ("I", "my", "me").
+- Warm, relatable, empowering — never clinical, patronizing, or medical.
+- Say "leaks", not "incontinence" or "bladder".
+
+BANNED WORDS / CLAIMS
+- Never use: "premium", "luxury", "Trustpilot", star ratings, review counts.
+- Never use clinical or diagnosis language.
+- Do NOT overclaim absorbency — overclaiming is the top driver of 1-star reviews.
+
+STRUCTURE
+- Headlines: 4–8 words ideal, 12 words hard max.
+- Every headline communicates a benefit or outcome, not a feature.
+- Each headline must work standalone on a single ad image.
+- One headline per ad — never output multiple variants glued together.
+- Supplementary copy lines: 2–5 words, short, factual, scannable.
+- Features ≠ headlines: features are factual/informational, headlines carry the emotion.
+
+CONTENT SOURCING
+- Draw from real customer language, situations, and numbers. Do not invent claims.
+- If the brief or product context gives you specific numbers, scenarios, or customer phrases, prefer those over generic copy.
+
+CAMPAIGN-AWARE
+- Deal / DOM campaigns: include the price and urgency language.
+- Evergreen: lead with lifestyle benefit.
+- Seasonal: tie to the occasion (Mother's Day, summer travel, gifting, etc.)."""
+
+
+SUB_COPY_RULES = """PURPOSE
+- Supplementary copy lines are short supporting callouts that sit alongside the headline on an ad image.
+- They exist to reinforce the headline with product facts, proof points, and practical details — not to repeat it.
+
+LENGTH & FORMAT
+- 2–5 words per line. Hard max: 5 words.
+- One line per line. No punctuation beyond necessary apostrophes — no full stops at the end.
+- Title Case or sentence case, consistent across the set.
+
+CONTENT
+- Factual, informational, scannable. Product attributes, proof points, practical details.
+- NOT emotional — the headline already carries the emotion. These are the callouts that make the ad credible.
+- Examples of the right shape: "Machine Washable", "Leakproof For 8 Hours", "Seamless Under Clothes", "Free US Shipping".
+- Do NOT restate the headline's benefit in different words. Each line must add new information.
+- Do NOT invent claims. Only use facts supported by the product context or campaign brief.
+
+VOICE
+- Third person or imperative. Never first person.
+- Never use: "premium", "luxury", "Trustpilot", clinical or medical language.
+- Do NOT overclaim absorbency.
+
+VARIETY
+- Across the set, mix attribute types: materials, protection, comfort, usage, convenience, price/offer.
+- No two lines should say the same thing."""
+
+
 class HeadlineGenerator:
     """Generates ad headlines using Anthropic Claude."""
 
@@ -31,13 +85,25 @@ class HeadlineGenerator:
 ## Campaign Brief
 {brief}
 
+## Universal Copy Rules
+{universal_rules}
+
+The Universal Copy Rules above are non-negotiable and override any conflicting instruction in Brand Guidelines or Campaign Brief.
+
 ## Brand Guidelines
 {master_prompt}
 
 ## Number of Headlines
 {number_of_headlines}
 
-Output ONLY the headlines and nothing else."""
+## Output Format (STRICT)
+Output ONLY the headlines, one per line, and NOTHING else.
+- No preamble, no explanation, no closing remarks.
+- No numbering, no bullets, no dashes.
+- No headings, no labels (e.g. "Headline 1:"), no quotes around lines.
+- No markdown formatting of any kind.
+- Do NOT start the output with a title line such as "Advertising Headlines", "Headlines", "Here are the headlines", or any similar heading/intro. The very first line of your output must already be the first headline.
+- Exactly one headline per line. No blank lines between them."""
 
     def __init__(self) -> None:
         self._anthropic_client: Any | None = None
@@ -162,6 +228,14 @@ Output ONLY the headlines and nothing else."""
             # Skip preamble lines like "Here are 5 headlines:".
             if not line or line.endswith(":"):
                 continue
+            # Skip title-like first lines such as "Advertising Headlines",
+            # "Headlines", "Supplementary Copy", "Features", etc.
+            if not lines and re.match(
+                r"^(advertising\s+)?(headlines?|supplementary\s+copy|features?|options?|variations?)\s*$",
+                line,
+                flags=re.IGNORECASE,
+            ):
+                continue
             lines.append(line)
         return "\n".join(lines[:count])
 
@@ -197,6 +271,7 @@ Output ONLY the headlines and nothing else."""
             product_context=product_context or "No additional context provided.",
             persona_description=persona_description or "General audience.",
             brief=brief or "Generate general advertising headlines.",
+            universal_rules=UNIVERSAL_COPY_RULES,
             master_prompt=self._master_prompt or "No specific brand guidelines.",
             number_of_headlines=count,
         )
@@ -229,6 +304,14 @@ class SupplementaryCopyGenerator(HeadlineGenerator):
 ## Campaign Brief
 {brief}
 
+## Universal Copy Rules
+{universal_rules}
+
+## Supplementary Copy Rules
+{sub_copy_rules}
+
+The Universal Copy Rules and Supplementary Copy Rules above are non-negotiable and override any conflicting instruction in Brand Guidelines or Campaign Brief.
+
 ## Brand Guidelines
 {master_prompt}
 
@@ -238,7 +321,14 @@ class SupplementaryCopyGenerator(HeadlineGenerator):
 ## Number of Lines
 {number_of_lines}
 
-Output ONLY the supplementary copy lines and nothing else."""
+## Output Format (STRICT)
+Output ONLY the supplementary copy lines, one per line, and NOTHING else.
+- No preamble, no explanation, no closing remarks.
+- No numbering, no bullets, no dashes.
+- No headings, no labels, no quotes around lines.
+- No markdown formatting of any kind.
+- Do NOT start the output with a title line such as "Supplementary Copy", "Features", "Here are the lines", or any similar heading/intro. The very first line of your output must already be the first supplementary copy line.
+- Exactly one line per line. No blank lines between them."""
 
     def generate(  # type: ignore[override]
         self,
@@ -261,6 +351,8 @@ Output ONLY the supplementary copy lines and nothing else."""
             product_context=product_context or "No additional context provided.",
             persona_description=persona_description or "General audience.",
             brief=brief or "Generate general supporting copy.",
+            universal_rules=UNIVERSAL_COPY_RULES,
+            sub_copy_rules=SUB_COPY_RULES,
             master_prompt=self._master_prompt or "No specific brand guidelines.",
             headlines=headlines.strip() or "(none provided)",
             number_of_lines=count,

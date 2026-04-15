@@ -111,6 +111,9 @@
                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent {% if view_only %}bg-gray-50{% endif %}"
                   placeholder="Enter headlines for your ads, one per line...&#10;e.g., Stay Dry All Day&#10;Comfort That Lasts&#10;Feel the Difference"
                   {% if view_only %}disabled{% endif %}>{{ generator.headlines|default:'' }}</textarea>
+        <p class="mt-1 text-xs text-gray-500">
+          Generate only fills the remaining lines up to the count above. If the textarea is already full, Generate replaces all lines with a fresh set.
+        </p>
       </div>
 
       <!-- Supplementary Copy / Features -->
@@ -139,6 +142,9 @@
                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent {% if view_only %}bg-gray-50{% endif %}"
                   placeholder="Short feature callouts that sit alongside the headline...&#10;e.g., Leak-proof for 12 hours&#10;Machine washable&#10;Free shipping"
                   {% if view_only %}disabled{% endif %}>{{ generator.supplementary_copy|default:'' }}</textarea>
+        <p class="mt-1 text-xs text-gray-500">
+          Generate only fills the remaining lines up to the count above. If the textarea is already full, Generate replaces all lines with a fresh set.
+        </p>
       </div>
 
       <!-- Customer Persona -->
@@ -323,10 +329,15 @@
   async function generateHeadlines() {
     const btn = document.getElementById('generate-headlines-btn');
     const textarea = document.getElementById('headlines');
-    const numHeadlines = document.getElementById('number_of_headlines').value || 5;
+    const target = parseInt(document.getElementById('number_of_headlines').value || 5);
     const brief = document.getElementById('brief').value;
     const personaSelect = document.getElementById('customer_persona');
     const personaId = personaSelect ? personaSelect.value : null;
+
+    const existingLines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+    const full = existingLines.length >= target;
+    const keepLines = full ? [] : existingLines;
+    const requestCount = full ? target : (target - existingLines.length);
 
     const originalText = btn.innerHTML;
     btn.disabled = true;
@@ -346,7 +357,7 @@
           'X-CSRFToken': '{{ csrf_token }}',
         },
         body: JSON.stringify({
-          number_of_headlines: parseInt(numHeadlines),
+          number_of_headlines: requestCount,
           brief: brief,
           persona_id: personaId || null,
         }),
@@ -354,7 +365,8 @@
 
       const data = await response.json();
       if (data.headlines) {
-        textarea.value = data.headlines;
+        const newLines = data.headlines.split('\n').map(l => l.trim()).filter(Boolean);
+        textarea.value = [...keepLines, ...newLines].join('\n');
         textarea.dispatchEvent(new Event('input'));
       } else if (data.error) {
         alert('Error: ' + data.error);
@@ -372,11 +384,16 @@
   async function generateSupplementaryCopy() {
     const btn = document.getElementById('generate-supplementary-copy-btn');
     const textarea = document.getElementById('supplementary_copy');
-    const numSupp = document.getElementById('number_of_supplementary_copy').value || 5;
+    const target = parseInt(document.getElementById('number_of_supplementary_copy').value || 5);
     const brief = document.getElementById('brief').value;
     const headlines = document.getElementById('headlines').value;
     const personaSelect = document.getElementById('customer_persona');
     const personaId = personaSelect ? personaSelect.value : null;
+
+    const existingLines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+    const full = existingLines.length >= target;
+    const keepLines = full ? [] : existingLines;
+    const requestCount = full ? target : (target - existingLines.length);
 
     const originalText = btn.innerHTML;
     btn.disabled = true;
@@ -396,7 +413,7 @@
           'X-CSRFToken': '{{ csrf_token }}',
         },
         body: JSON.stringify({
-          number_of_supplementary_copy: parseInt(numSupp),
+          number_of_supplementary_copy: requestCount,
           brief: brief,
           headlines: headlines,
           persona_id: personaId || null,
@@ -405,7 +422,8 @@
 
       const data = await response.json();
       if (data.supplementary_copy) {
-        textarea.value = data.supplementary_copy;
+        const newLines = data.supplementary_copy.split('\n').map(l => l.trim()).filter(Boolean);
+        textarea.value = [...keepLines, ...newLines].join('\n');
         textarea.dispatchEvent(new Event('input'));
       } else if (data.error) {
         alert('Error: ' + data.error);
