@@ -64,14 +64,14 @@ When multiple reference images are attached, treat them as follows:
 - FLATLAY / GHOST-MANNEQUIN PHOTO (product shown alone, possibly in multiple colors): use as an accurate reference for product detail, color, and texture. Do NOT redraw. You may include a flatlay as a secondary design element (e.g. a small color strip or sidebar), but never as the hero unless no model photo is provided.
 
 STYLE REFERENCE (when one is attached):
-Treat the style reference as a TEMPLATE. Replicate its layout structure, text placement, typography style, color palette, composition, AND any supporting text elements it contains — CTAs, prices, badges, taglines, disclaimers, supporting copy — transcribed EXACTLY as they appear in the style reference, in the same position and style. Two things are replaced, and only these two:
-1. The style reference's main headline is replaced with the HEADLINE specified elsewhere in this prompt.
-2. The style reference's sub-copy / descriptive body text is replaced with the SUPPLEMENTARY COPY specified elsewhere in this prompt (if any).
-The product and model must come from the separate reference photos, NOT from the style reference — do not copy the person or product shown in the style reference. Everything else about the style reference is preserved verbatim. Do NOT invent new CTAs, prices, or badges that don't exist in the style reference, and do NOT omit ones that do.
+Treat the style reference as a TEMPLATE. Replicate its layout structure, text placement, typography style, color palette, composition, AND any supporting text elements it contains — CTAs, prices, badges, taglines, disclaimers, supporting copy — transcribed EXACTLY as they appear in the style reference, in the same position and style. Replacements are made ONLY where the style reference has an equivalent slot:
+1. If the style reference has a main headline slot, replace its headline text with the HEADLINE specified elsewhere in this prompt. If it has no headline slot, do not add one.
+2. If the style reference has a sub-copy / descriptive body slot AND SUPPLEMENTARY COPY is specified elsewhere in this prompt, replace the style reference's sub-copy with the SUPPLEMENTARY COPY. If the style reference has NO sub-copy slot, do NOT add one — omit the SUPPLEMENTARY COPY entirely, even if it is specified elsewhere in this prompt. If the style reference has a sub-copy slot but no SUPPLEMENTARY COPY is specified, leave that slot empty.
+The product and model must come from the separate reference photos, NOT from the style reference — do not copy the person or product shown in the style reference. Everything else about the style reference is preserved verbatim. Do NOT invent new CTAs, prices, or badges that don't exist in the style reference, and do NOT omit ones that do. Do NOT add text slots (headlines, sub-copy, CTAs, badges) that the style reference does not already have.
 
 TEXT CONTENT RULES (STRICT):
-- The HEADLINE (and SUPPLEMENTARY COPY, if provided) specified elsewhere in this prompt must be rendered exactly as written. Spell every word exactly — do not paraphrase, do not auto-correct, do not add punctuation that isn't there. Render exactly ONE headline, never multiple or alternate versions.
-- If a STYLE REFERENCE is attached: additional text elements (CTAs, prices, badges, taglines, disclaimers) come from the style reference and must be transcribed exactly as they appear there. Do NOT invent copy beyond what the style reference shows, and do NOT drop copy the style reference shows.
+- The HEADLINE (and SUPPLEMENTARY COPY, if provided) specified elsewhere in this prompt must be rendered exactly as written wherever it is rendered. Spell every word exactly — do not paraphrase, do not auto-correct, do not add punctuation that isn't there. Render exactly ONE headline, never multiple or alternate versions.
+- If a STYLE REFERENCE is attached: whether HEADLINE and SUPPLEMENTARY COPY appear in the image is determined by whether the style reference has corresponding slots (see STYLE REFERENCE rules above). Additional text elements (CTAs, prices, badges, taglines, disclaimers) come from the style reference and must be transcribed exactly as they appear there. Do NOT invent copy beyond what the style reference shows, and do NOT drop copy the style reference shows.
 - If NO style reference is attached: the ONLY text in the image is the HEADLINE (and SUPPLEMENTARY COPY, if provided). Do NOT add any other text — no prices, no CTAs ("Shop Now", "Buy", "Order Today"), no extra taglines, no promo badges, no brand name, no website, no hashtags, no disclaimers, no subtitles, no legal text.
 
 BRAND LOGO (when one is attached):
@@ -80,15 +80,17 @@ Reproduce the provided logo image exactly as supplied. Do NOT re-type, re-draw, 
 BRAND:
 Do NOT reference Trustpilot, reviews, or star ratings. Do NOT use "premium", "luxury", or similar upmarket language. Do NOT include any logo, brand mark, or wordmark unless a logo image has been explicitly attached as a reference.
 
-BACKGROUND INTEGRATION:
-Blend the ad background seamlessly with the model photo's existing background. Avoid jarring color contrasts at the edges of the composited model photo. The finished ad should look like one cohesive image, not a cutout pasted onto an unrelated backdrop.
+BACKGROUND INTEGRATION (CRITICAL):
+The ad background MUST match the model photo's existing background. Sample the dominant color and tone of the model photo's backdrop and use that SAME color as the background for the entire ad canvas, including any side panels, text areas, or negative space where copy lives. Do NOT introduce a second background color, a white or off-white panel, a split-screen layout, or a contrasting block behind the text — the text must sit on the same continuous background that surrounds the model. There must be NO visible vertical or horizontal seam, gradient edge, or hard boundary between the model photo's backdrop and the rest of the ad. The finished ad should look like one continuous scene where the headline and supporting graphics are composited directly over an extended version of the model photo's backdrop.
+This rule overrides any conflicting background or panel treatment implied by the STYLE REFERENCE. Replicate the style reference's layout and typography, but recolor its background panels to match the model photo.
 
 QUALITY CHECK BEFORE RETURNING:
 1. Is every letter of the headline spelled exactly as written in this prompt?
 2. Have you added any text beyond what the TEXT CONTENT RULES allow? If yes, remove it.
 3. Have you redrawn, recolored, or reinterpreted any product? If yes, replace it with the original reference photo.
 4. Does the style reference's person or product appear anywhere in the final image? If yes, replace it with the reference photos. (Style reference text elements like CTAs/prices/badges SHOULD be preserved — only the person and product are replaced.)
-5. Is the model photo's background blended with the ad background, or is there a visible cutout seam? Fix any seams.
+5. Is the ad background one continuous color matching the model photo's backdrop, with NO white/off-white panels, split-screens, or visible seams behind the text? If there is a seam or a second background color, recolor the panels to match the model photo's backdrop.
+6. Does the image contain SUPPLEMENTARY COPY that the style reference did not have a slot for? If so, remove it — supplementary copy is only rendered when the style reference already has a sub-copy slot.
 
 Generate a high-quality advertisement image.
 """.strip()

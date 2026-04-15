@@ -26,11 +26,21 @@ logger = logging.getLogger(__name__)
 
 # Hardcoded config values
 DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview"
-# Gemini 3 image models suffer severe latency degradation (5–30 min stalls)
-# when temperature is below 1.0. Keep this at 1.0.
-TEMPERATURE = 1.0
+# Default temperature when APISettings lookup fails. Gemini 3 image models
+# have historically shown severe latency degradation below 1.0 — keep the
+# fallback at 1.0 so failures don't silently regress latency.
+DEFAULT_TEMPERATURE = 1.0
 MAX_RETRIES = 3
 RETRY_DELAY = 5
+
+
+def _get_temperature() -> float:
+    """Load sampling temperature from APISettings, falling back to the default."""
+    try:
+        from everdries_ad_generator.campaigns.models import APISettings
+        return float(APISettings.get_settings().image_temperature)
+    except Exception:
+        return DEFAULT_TEMPERATURE
 
 # Error messages that indicate the model is unavailable
 _UNAVAILABLE_SIGNALS = (
@@ -153,7 +163,7 @@ class GeminiProvider(ImageProvider):
 
         config = types.GenerateContentConfig(
             response_modalities=["IMAGE"],
-            temperature=TEMPERATURE,
+            temperature=_get_temperature(),
             image_config=types.ImageConfig(aspect_ratio=prompt.aspect_ratio),
         )
 
@@ -239,7 +249,7 @@ class GeminiProvider(ImageProvider):
 
         gen_config = types.GenerateContentConfig(
             response_modalities=["IMAGE"],
-            temperature=TEMPERATURE,
+            temperature=_get_temperature(),
             image_config=types.ImageConfig(**image_config_kwargs) if image_config_kwargs else None,
         )
 

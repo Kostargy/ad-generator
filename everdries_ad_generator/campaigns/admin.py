@@ -103,7 +103,7 @@ class APISettingsAdmin(admin.ModelAdmin):
             "description": "Stored in plain text and visible here. Treat this admin page as sensitive.",
         }),
         ("Models", {
-            "fields": ("gemini_model", "critic_model", "critic_max_retries"),
+            "fields": ("gemini_model", "critic_model", "critic_max_retries", "image_temperature"),
         }),
         ("Master Prompt", {
             "fields": ("master_prompt",),

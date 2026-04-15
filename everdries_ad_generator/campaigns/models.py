@@ -341,6 +341,15 @@ class APISettings(models.Model):
         default="",
         help_text="Master prompt instructions for image generation",
     )
+    image_temperature = models.FloatField(
+        default=1.0,
+        help_text=(
+            "Sampling temperature for Gemini image generation (0.0–2.0). "
+            "Lower = more faithful to reference images and instructions. "
+            "Note: Gemini 3 image models have historically shown severe "
+            "latency degradation below 1.0 — test before lowering in prod."
+        ),
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     DEFAULT_MASTER_PROMPT = """BRAND: Everdries leakproof underwear for women 65+. Tone: warm, relatable, empowering — never clinical or patronizing. No Trustpilot references. No 'premium' messaging. Do NOT include any logo or brand mark in the image.
