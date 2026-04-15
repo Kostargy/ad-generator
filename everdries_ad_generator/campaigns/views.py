@@ -807,6 +807,7 @@ def settings_view(request):
         critic_model = request.POST.get("critic_model", "").strip()
         headline_anthropic_model = request.POST.get("headline_anthropic_model", "").strip()
         critic_max_retries = request.POST.get("critic_max_retries", "").strip()
+        image_temperature = request.POST.get("image_temperature", "").strip()
         master_prompt = request.POST.get("master_prompt", "").strip()
 
         if primary_provider:
@@ -823,6 +824,11 @@ def settings_view(request):
         if critic_max_retries:
             try:
                 api_settings.critic_max_retries = max(0, min(10, int(critic_max_retries)))
+            except ValueError:
+                pass
+        if image_temperature:
+            try:
+                api_settings.image_temperature = max(0.0, min(2.0, float(image_temperature)))
             except ValueError:
                 pass
         api_settings.master_prompt = master_prompt
