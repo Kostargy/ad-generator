@@ -53,6 +53,47 @@ DIMENSION_TO_ASPECT = {
 DEFAULT_ASPECT_RATIO = "1:1"
 
 
+GLOBAL_GENERATION_RULES = """
+GLOBAL GENERATION RULES — these apply to every image you generate. Follow them strictly; they override any conflicting instruction elsewhere in the prompt.
+
+REFERENCE IMAGES (CRITICAL):
+I have provided labeled product reference photos. These are REAL product photos that MUST appear in the final ad AS-IS. Do NOT regenerate, redraw, reinterpret, or create new versions of the products shown. Place the actual provided photo into the ad design. Add text, graphics, and design elements AROUND and ON TOP of the real photo. Do NOT invent new colors or modify the colors of the products. The exact colors in the reference photos are the ONLY colors that should appear on the product.
+
+When multiple reference images are attached, treat them as follows:
+- MODEL PHOTO (a person wearing or holding the product): use this exact photo as-is as the hero of the ad. Do NOT redraw the model, the pose, the clothing, or the background of this photo — composite design elements around and on top of it.
+- FLATLAY / GHOST-MANNEQUIN PHOTO (product shown alone, possibly in multiple colors): use as an accurate reference for product detail, color, and texture. Do NOT redraw. You may include a flatlay as a secondary design element (e.g. a small color strip or sidebar), but never as the hero unless no model photo is provided.
+
+STYLE REFERENCE (when one is attached):
+Treat the style reference as a TEMPLATE. Replicate its layout structure, text placement, typography style, color palette, composition, AND any supporting text elements it contains — CTAs, prices, badges, taglines, disclaimers, supporting copy — transcribed EXACTLY as they appear in the style reference, in the same position and style. Two things are replaced, and only these two:
+1. The style reference's main headline is replaced with the HEADLINE specified elsewhere in this prompt.
+2. The style reference's sub-copy / descriptive body text is replaced with the SUPPLEMENTARY COPY specified elsewhere in this prompt (if any).
+The product and model must come from the separate reference photos, NOT from the style reference — do not copy the person or product shown in the style reference. Everything else about the style reference is preserved verbatim. Do NOT invent new CTAs, prices, or badges that don't exist in the style reference, and do NOT omit ones that do.
+
+TEXT CONTENT RULES (STRICT):
+- The HEADLINE (and SUPPLEMENTARY COPY, if provided) specified elsewhere in this prompt must be rendered exactly as written. Spell every word exactly — do not paraphrase, do not auto-correct, do not add punctuation that isn't there. Render exactly ONE headline, never multiple or alternate versions.
+- If a STYLE REFERENCE is attached: additional text elements (CTAs, prices, badges, taglines, disclaimers) come from the style reference and must be transcribed exactly as they appear there. Do NOT invent copy beyond what the style reference shows, and do NOT drop copy the style reference shows.
+- If NO style reference is attached: the ONLY text in the image is the HEADLINE (and SUPPLEMENTARY COPY, if provided). Do NOT add any other text — no prices, no CTAs ("Shop Now", "Buy", "Order Today"), no extra taglines, no promo badges, no brand name, no website, no hashtags, no disclaimers, no subtitles, no legal text.
+
+BRAND LOGO (when one is attached):
+Reproduce the provided logo image exactly as supplied. Do NOT re-type, re-draw, or approximate the logo's wordmark — place the actual logo pixels into the ad. If no logo image is attached, do NOT include any logo or brand mark in the image.
+
+BRAND:
+Do NOT reference Trustpilot, reviews, or star ratings. Do NOT use "premium", "luxury", or similar upmarket language. Do NOT include any logo, brand mark, or wordmark unless a logo image has been explicitly attached as a reference.
+
+BACKGROUND INTEGRATION:
+Blend the ad background seamlessly with the model photo's existing background. Avoid jarring color contrasts at the edges of the composited model photo. The finished ad should look like one cohesive image, not a cutout pasted onto an unrelated backdrop.
+
+QUALITY CHECK BEFORE RETURNING:
+1. Is every letter of the headline spelled exactly as written in this prompt?
+2. Have you added any text beyond what the TEXT CONTENT RULES allow? If yes, remove it.
+3. Have you redrawn, recolored, or reinterpreted any product? If yes, replace it with the original reference photo.
+4. Does the style reference's person or product appear anywhere in the final image? If yes, replace it with the reference photos. (Style reference text elements like CTAs/prices/badges SHOULD be preserved — only the person and product are replaced.)
+5. Is the model photo's background blended with the ad background, or is there a visible cutout seam? Fix any seams.
+
+Generate a high-quality advertisement image.
+""".strip()
+
+
 @dataclass
 class GeneratorConfig:
     """Configuration extracted from Django Generator."""
@@ -154,11 +195,7 @@ class ImageGenAdapter:
         for headline in cfg.headlines:
             for style_idx, style_path in enumerate(style_refs):
                 for model_idx, model_path in enumerate(model_refs):
-                    prompt_text = self._format_prompt(
-                        headline=headline,
-                        has_style_ref=style_path is not None,
-                        has_flat_lays=bool(flat_lay_refs),
-                    )
+                    prompt_text = self._format_prompt(headline=headline)
 
                     # Build a name that distinguishes each cell in the fan-out
                     # so Ad rows are identifiable in the UI.
@@ -200,12 +237,7 @@ class ImageGenAdapter:
         except Exception:
             return ""
 
-    def _format_prompt(
-        self,
-        headline: str,
-        has_style_ref: bool = False,
-        has_flat_lays: bool = False,
-    ) -> str:
+    def _format_prompt(self, headline: str) -> str:
         """Build the prompt text for image generation."""
         cfg = self.config
         parts = []
@@ -221,41 +253,6 @@ class ImageGenAdapter:
                 "ONLY — do NOT transcribe, paraphrase, or render any of this text "
                 "into the image):\n"
                 f"{cfg.product_context}"
-            )
-
-        # Reference image instructions. The first attached image (when one
-        # exists) is a real model-on-product photo that must be embedded
-        # as-is. Any further images are flat-lay / ghost-mannequin shots of
-        # the product alone — used as accurate references for product
-        # detail, color, and texture.
-        if has_flat_lays:
-            parts.append(
-                "\nREFERENCE IMAGES (CRITICAL): I have provided multiple "
-                "reference photos. The FIRST image is a REAL model-on-product "
-                "photo that MUST appear in the final ad AS-IS — do NOT "
-                "regenerate, redraw, or modify it. Place the actual photo "
-                "into the ad design and add text/graphics AROUND and ON TOP "
-                "of it. The REMAINING images are flat-lay / ghost-mannequin "
-                "shots of the product alone — use them as accurate references "
-                "for product detail, color, and texture. Do NOT render the "
-                "flat-lay images as standalone hero shots unless the style "
-                "reference layout explicitly calls for it."
-            )
-        else:
-            parts.append(
-                "\nREFERENCE IMAGES (CRITICAL): I have provided labeled product "
-                "reference photos. These are REAL product photos that MUST appear "
-                "in the final ad AS-IS. Do NOT regenerate, redraw, or modify them. "
-                "Place the actual photo into the ad design. Add text and graphics "
-                "AROUND and ON TOP of the real photo."
-            )
-
-        # Style reference instructions
-        if has_style_ref:
-            parts.append(
-                "\nSTYLE REFERENCE: Replicate the layout structure, typography, "
-                "and composition from the style reference — but use ONLY the "
-                "product/model photos from the separate reference images."
             )
 
         # The headline — must be transcribed exactly, not paraphrased.
@@ -290,47 +287,6 @@ class ImageGenAdapter:
                 )
             parts.append(supp_block)
 
-        # Text content rules — image must show ONLY the single headline above
-        # plus any supplementary copy lines provided. Style references are for
-        # layout/composition only, never a license to invent additional copy.
-        if has_supp:
-            allowed_text = (
-                "the single HEADLINE TEXT above plus the SUPPLEMENTARY COPY "
-                "lines above"
-            )
-        else:
-            allowed_text = "the single HEADLINE TEXT above"
-
-        if has_style_ref:
-            parts.append(
-                "\nTEXT CONTENT RULES (STRICT):\n"
-                f"- The ONLY text that may appear in the image is "
-                f"{allowed_text}. Spell every word exactly as written.\n"
-                "- Use the style reference for LAYOUT, COMPOSITION, "
-                "TYPOGRAPHY and COLOR ONLY. Do NOT copy any text from the "
-                "style reference.\n"
-                "- If the style reference contains slots for prices, badges, "
-                "CTAs, taglines, brand marks, or any other copy beyond what "
-                "is allowed above, leave those slots EMPTY or omit them "
-                "entirely. Do NOT invent copy to fill them.\n"
-                "- Do NOT render multiple headlines, alternate versions, or "
-                "variations of the headline. Exactly one headline string "
-                "appears in the final image."
-            )
-        else:
-            parts.append(
-                "\nTEXT CONTENT RULES (STRICT):\n"
-                f"- The ONLY text that may appear in the image is "
-                f"{allowed_text}. Spell every word exactly as written.\n"
-                "- Do NOT add any other text: no prices, no CTAs "
-                "('Shop Now', 'Buy', 'Order Today'), no extra taglines, no "
-                "promo badges, no brand name, no website, no hashtags, no "
-                "disclaimers, no subtitles beyond what is allowed above.\n"
-                "- Do NOT render multiple headlines, alternate versions, or "
-                "variations of the headline. Exactly one headline string "
-                "appears in the final image."
-            )
-
         # Brief/additional creative direction.
         # Framed as direction ONLY — must not be rendered as on-image text.
         if cfg.brief:
@@ -348,17 +304,12 @@ class ImageGenAdapter:
         if cfg.persona_description:
             parts.append(f"\nBRAND TONE: {cfg.persona_description}")
 
-        # Master prompt (global brand guidelines)
+        # Master prompt (optional, admin-configurable)
         master_prompt = self._get_master_prompt()
         if master_prompt:
             parts.append(f"\nGLOBAL GUIDELINES:\n{master_prompt}")
 
-        parts.append(
-            "\nGenerate a high-quality advertisement image. Double-check "
-            "that every letter of the HEADLINE TEXT is spelled correctly "
-            "and that no extra text has been added beyond what the TEXT "
-            "CONTENT RULES allow."
-        )
+        parts.append(f"\n{GLOBAL_GENERATION_RULES}")
 
         return "\n".join(parts)
 
