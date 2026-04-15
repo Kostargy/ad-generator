@@ -145,17 +145,21 @@ class GeminiProvider(ImageProvider):
                 if img.mode not in ("RGB", "RGBA"):
                     img = img.convert("RGB")
                 contents.append(
-                    "STYLE REFERENCE TEMPLATE — treat this as a template. "
-                    "Replicate its layout, text placement, typography, and any "
-                    "supporting text elements it contains (CTAs, buttons, "
-                    "prices, badges, taglines) transcribed EXACTLY as shown, "
-                    "in the same position, EXACTLY ONCE. Do NOT duplicate any "
-                    "element — each CTA/button/badge/price appears in the "
-                    "final ad exactly once. Do NOT copy the person or product "
-                    "from this image (those come from the reference photos). "
-                    "Do NOT copy the background color or any panels from this "
-                    "image (the background comes from the model photo, per "
-                    "BACKGROUND INTEGRATION rules):"
+                    "LAYOUT REFERENCE — follow this ad's layout structure, "
+                    "text placement, and typography style. Do NOT use any "
+                    "person, product, colors, or text content from this "
+                    "image. In this layout reference, the LARGEST text is "
+                    "the headline and the remaining text is the sub-copy. "
+                    "Replace the headline with the supplied HEADLINE. "
+                    "Replace the sub-copy with the supplied SUPPLEMENTARY "
+                    "COPY — DELETE the style reference's original sub-copy "
+                    "text entirely and write the supplied lines in its "
+                    "place. The original sub-copy text in this image is "
+                    "PLACEHOLDER ONLY and MUST NOT appear in the final ad. "
+                    "MATCH THE SHAPE of the style reference's sub-copy "
+                    "slot: if the slot holds one line, render only the "
+                    "first supplied line; if it holds multiple lines, "
+                    "render that many supplied lines in order:"
                 )
                 contents.append(img)
             except Exception as e:

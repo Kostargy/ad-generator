@@ -76,8 +76,8 @@ Interaction with the STYLE REFERENCE (below): the style reference determines WHE
 
 STYLE REFERENCE (when one is attached):
 Treat the style reference as a TEMPLATE. Replicate its layout structure, text placement, typography style, color palette, composition, AND any supporting text elements it contains — CTAs, prices, badges, taglines, disclaimers, supporting copy — transcribed EXACTLY as they appear in the style reference, in the same position and style. Replacements are made ONLY where the style reference has an equivalent slot:
-1. If the style reference has a main headline slot, replace its headline text with the HEADLINE specified elsewhere in this prompt. If it has no headline slot, do not add one.
-2. If the style reference has a sub-copy / descriptive body slot AND SUPPLEMENTARY COPY is specified elsewhere in this prompt, replace the style reference's sub-copy with the SUPPLEMENTARY COPY. If the style reference has NO sub-copy slot, do NOT add one — omit the SUPPLEMENTARY COPY entirely, even if it is specified elsewhere in this prompt. If the style reference has a sub-copy slot but no SUPPLEMENTARY COPY is specified, leave that slot empty.
+1. HEADLINE slot. If the style reference has a main headline slot, DELETE the style reference's existing headline text and write the HEADLINE specified elsewhere in this prompt in its place. The style reference's original headline text is PLACEHOLDER ONLY — do NOT transcribe it, do NOT paraphrase it, do NOT preserve any of it in the final ad. If the style reference has no headline slot, do not add one.
+2. SUB-COPY slot. If the style reference has a sub-copy / descriptive body slot AND SUPPLEMENTARY COPY is specified elsewhere in this prompt, DELETE the style reference's existing sub-copy text and write the SUPPLEMENTARY COPY in its place. The style reference's original sub-copy text is PLACEHOLDER ONLY — do NOT transcribe it, do NOT paraphrase it, do NOT preserve any of it in the final ad. When writing the SUPPLEMENTARY COPY, MATCH THE SHAPE of the style reference's sub-copy slot: count the number of lines the style reference's sub-copy holds and render only that many lines from the SUPPLEMENTARY COPY, in order, starting from the first line. Example: if the style reference's sub-copy is ONE line and SUPPLEMENTARY COPY contains four lines, render only the FIRST line and discard the other three. If the style reference has NO sub-copy slot, do NOT add one — omit the SUPPLEMENTARY COPY entirely, even if it is specified elsewhere in this prompt. If the style reference has a sub-copy slot but no SUPPLEMENTARY COPY is specified, leave that slot empty.
 The product and model must come from the separate reference photos, NOT from the style reference — do not copy the person or product shown in the style reference. Everything else about the style reference is preserved verbatim. Do NOT invent new CTAs, prices, or badges that don't exist in the style reference, and do NOT omit ones that do. Do NOT add text slots (headlines, sub-copy, CTAs, badges) that the style reference does not already have.
 
 TEXT CONTENT RULES (STRICT):
@@ -100,6 +100,7 @@ QUALITY CHECK BEFORE RETURNING:
 5. Does the model photo's backdrop extend edge-to-edge across the ENTIRE canvas, with the text composited directly on top of it? If there is ANY white/off-white/cream panel, colored sidebar, split-screen, vertical or horizontal seam, or rectangular shape of a different color behind the text — remove it and extend the model photo's backdrop to cover that area. The canvas must have ONE continuous background.
 6. Does the image contain SUPPLEMENTARY COPY that the style reference did not have a slot for? If so, remove it — supplementary copy is only rendered when the style reference already has a sub-copy slot.
 7. Does any supporting element appear more than once? Count the CTAs/buttons (e.g. "BUY NOW", "SHOP NOW"), prices, badges, taglines, and disclaimers. If any of them appear twice or more, delete the duplicates — each supporting element must appear exactly once, in the position shown in the style reference.
+8. Did you transcribe any of the style reference's ORIGINAL headline or sub-copy text into the final ad? Compare the headline and sub-copy in your output to the headline and sub-copy in the style reference image. If any of the style reference's original headline or sub-copy words appear in the output, DELETE them and replace with the supplied HEADLINE and SUPPLEMENTARY COPY. The style reference's original headline and sub-copy text is PLACEHOLDER ONLY — it MUST NOT appear in the output. (CTAs, buttons, prices, and badges from the style reference are different — those SHOULD be transcribed exactly. Only the headline and sub-copy slots get replaced.)
 
 Generate a high-quality advertisement image.
 """.strip()
@@ -292,17 +293,32 @@ class ImageGenAdapter:
 
             if has_style_ref:
                 supp_block = (
-                    "\nSUPPLEMENTARY COPY (CANDIDATE SUB-COPY ONLY — do NOT "
-                    "render this anywhere unless the style reference already "
-                    "has a sub-copy / descriptive body slot. If the style "
-                    "reference has a sub-copy slot, replace the style "
-                    "reference's sub-copy text with the lines below, "
-                    "transcribed exactly as written. If the style reference "
-                    "has NO sub-copy slot, OMIT these lines entirely — do "
-                    "NOT render them anywhere in the image, do NOT create "
-                    "a new sub-copy area, do NOT add them as bullets, "
+                    "\nSUPPLEMENTARY COPY (REPLACEMENT for the style "
+                    "reference's sub-copy slot — read carefully):\n"
+                    "STEP 1: If the style reference has NO sub-copy / "
+                    "descriptive body slot, OMIT these lines entirely — do "
+                    "NOT render them anywhere in the image, do NOT create a "
+                    "new sub-copy area, do NOT add them as bullets, "
                     "callouts, badges, or captions, and do NOT place them "
-                    "around or beneath the headline):\n"
+                    "around or beneath the headline. Stop here.\n"
+                    "STEP 2: If the style reference HAS a sub-copy slot, "
+                    "DELETE the style reference's existing sub-copy text "
+                    "from that slot. The style reference's original "
+                    "sub-copy text is PLACEHOLDER ONLY — do NOT transcribe "
+                    "it, do NOT paraphrase it, do NOT preserve any of it "
+                    "in the final ad. None of the original sub-copy words "
+                    "from the style reference may appear in the output.\n"
+                    "STEP 3: Write the lines below into that now-empty "
+                    "sub-copy slot, transcribed exactly as written. MATCH "
+                    "THE SHAPE of the slot: count how many lines the style "
+                    "reference's sub-copy slot holds and render ONLY that "
+                    "many lines from the list below, starting from the "
+                    "first line and taking them in order. If the style "
+                    "reference's sub-copy is a single line, render ONLY "
+                    "the first line below and discard the rest. If it is "
+                    "two lines, render only the first two, and so on. "
+                    "Never render more lines than the style reference's "
+                    "sub-copy slot holds.\n"
                     f"{supp_payload}"
                 )
             else:
